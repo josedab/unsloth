@@ -34,12 +34,11 @@ import os
 import shutil
 import pickle
 import gc
-from transformers.models.llama.modeling_llama import logger
 from .kernels import fast_dequantize, QUANT_STATE, get_lora_parameters_bias
 import subprocess
 import psutil
 import re
-from transformers.models.llama.modeling_llama import logger
+from unsloth.logging import logger
 from .tokenizer_utils import fix_sentencepiece_gguf
 from .models.loader_utils import get_model_name
 from .ollama_template_mappers import OLLAMA_TEMPLATES, MODEL_TO_OLLAMA_TEMPLATE_MAPPER
@@ -132,7 +131,7 @@ ALLOWED_QUANTS = {
 
 def print_quantization_methods():
     for key, value in ALLOWED_QUANTS.items():
-        print(f'"{key}"  ==> {value}')
+        logger.info(f'"{key}"  ==> {value}')
 
 
 def check_if_sentencepiece_model(
@@ -212,7 +211,7 @@ def _merge_lora(layer, name):
 
 def fast_save_pickle(shard, name):
     # Use this if # CPUs is <= 2
-    print(f"Unsloth: Saving {name}...")
+    logger.info(f"Saving {name}...")
     torch.save(
         shard,
         name,
@@ -317,13 +316,13 @@ def unsloth_save_model(
         )
 
     if save_method == "merged_4bit":
-        print("Unsloth: Merging 4bit and LoRA weights to 4bit...")
-        print("This might take 5 minutes...")
+        logger.info("Merging 4bit and LoRA weights to 4bit...")
+        logger.info("This might take 5 minutes...")
 
         # Counteract no LoRA adapters!
         if hasattr(model, "merge_and_unload"):
             model = model.merge_and_unload()
-        print("Done.")
+        logger.info("Done.")
 
     if tags is not None:
         assert isinstance(tags, (list, tuple))
@@ -344,9 +343,9 @@ def unsloth_save_model(
             )
 
         if save_method == "lora":
-            print("Unsloth: Saving LoRA adapters. Please wait...")
+            logger.info("Saving LoRA adapters. Please wait...")
         elif save_method == "merged_4bit":
-            print("Unsloth: Saving 4bit Bitsandbytes model. Please wait...")
+            logger.info("Saving 4bit Bitsandbytes model. Please wait...")
 
         # Update model tag
         _ = upload_to_huggingface(
@@ -396,7 +395,7 @@ def unsloth_save_model(
             tokenizer.padding_side = old_padding_side
 
         if hasattr(model, "config"):
-            print(
+            logger.info(
                 f"Saved {save_method} model to https://huggingface.co/" + save_directory
             )
         return save_directory, None
@@ -470,7 +469,7 @@ def unsloth_save_model(
             )
 
         if tokenizer is not None:
-            print("Unsloth: Saving tokenizer...", end = "")
+            logger.info("Saving tokenizer...")
 
             # Set padding side to left for inference
             old_padding_side = tokenizer.padding_side
@@ -481,13 +480,11 @@ def unsloth_save_model(
             # Revert back padding side
             tokenizer.padding_side = old_padding_side
 
-            print(" Done.")
-        else:
-            print()
+            logger.info("Done.")
 
-        print("Unsloth: Saving model...", end = "")
+        logger.info("Saving model...")
         if save_method != "lora":
-            print(" This might take 10 minutes for Llama-7b...", end = "")
+            logger.info("This might take 10 minutes for Llama-7b...")
 
         # [TODO] Is this correct?
         if save_method == "lora":
@@ -496,12 +493,12 @@ def unsloth_save_model(
         model.save_pretrained(**save_pretrained_settings)
 
         if push_to_hub and hasattr(model, "config"):
-            print(
+            logger.info(
                 "Saved to https://huggingface.co/"
                 + save_pretrained_settings["save_directory"]
             )
 
-        print(" Done.")
+        logger.info("Done.")
         return save_directory, None
 
     # If push_to_hub, we must remove the .../ part of a repo
@@ -529,7 +526,7 @@ def unsloth_save_model(
         tokenizer_save_settings["save_directory"] = new_save_directory
         save_directory = new_save_directory
 
-    print("Unsloth: Merging 4bit and LoRA weights to 16bit...")
+    logger.info("Merging 4bit and LoRA weights to 16bit...")
 
     # Determine max RAM usage minus sharding
     max_ram = psutil.virtual_memory().available
@@ -577,8 +574,8 @@ def unsloth_save_model(
         max_ram -= sharded_ram_usage * 0.25  # Uses much less
 
     max_ram = int(max(0, max_ram) * maximum_memory_usage)
-    print(
-        f"Unsloth: Will use up to "
+    logger.info(
+        f"Will use up to "
         f"{round(max_ram/1024/1024/1024, 2)} out of "
         f"{round(psutil.virtual_memory().total/1024/1024/1024, 2)} RAM for saving."
     )
@@ -621,7 +618,7 @@ def unsloth_save_model(
         torch.cuda.get_device_properties(0).total_memory * maximum_memory_usage
     )
 
-    print("Unsloth: Saving model... This might take 5 minutes ...")
+    logger.info("Saving model... This might take 5 minutes ...")
 
     from tqdm import tqdm as ProgressBar
 
@@ -748,14 +745,14 @@ def unsloth_save_model(
 
     # Check if pushing to an organization
     if save_pretrained_settings["push_to_hub"] and (username != actual_username):
-        print(f"Unsloth: Saving to organization with address {new_save_directory}")
+        logger.info(f"Saving to organization with address {new_save_directory}")
         # We upload everything at the end!
         tokenizer_save_settings["push_to_hub"] = False
         tokenizer_save_settings["save_directory"] = new_save_directory
 
     # Save tokenizer
     if tokenizer is not None:
-        print("Unsloth: Saving tokenizer...", end = "")
+        logger.info("Saving tokenizer...")
 
         # Set padding side to left for inference
         old_padding_side = tokenizer.padding_side
@@ -766,9 +763,7 @@ def unsloth_save_model(
         # Revert back padding side
         tokenizer.padding_side = old_padding_side
 
-        print(" Done.")
-    else:
-        print()
+        logger.info("Done.")
 
     # Since merged, edit quantization_config
     old_config = model.config
@@ -788,7 +783,7 @@ def unsloth_save_model(
 
     # Check if pushing to an organization
     if save_pretrained_settings["push_to_hub"] and (username != actual_username):
-        print(f"Unsloth: Saving to organization with address {new_save_directory}")
+        logger.info(f"Saving to organization with address {new_save_directory}")
         # Pushing to organization!
         # Sadly .save_pretrained doesn't work :(
         # We first save it via .save_pretrained, then upload manually!
@@ -801,7 +796,7 @@ def unsloth_save_model(
 
         hf_api = HfApi(token = save_pretrained_settings["token"])
 
-        print("Unsloth: Uploading all files... Please wait...")
+        logger.info("Uploading all files... Please wait...")
         hf_api.upload_folder(
             folder_path = new_save_directory,
             path_in_repo = ".",
@@ -819,10 +814,10 @@ def unsloth_save_model(
         original_model = original_model.model
         original_model.config = old_config
     model.config = old_config
-    print("Done.")
+    logger.info("Done.")
 
     if push_to_hub and hasattr(model, "config"):
-        print(
+        logger.info(
             f"Saved merged model to https://huggingface.co/{username}/{save_directory.lstrip('/').split('/')[-1]}"
         )
 
@@ -938,7 +933,7 @@ def try_execute(commands, force_complete = False):
                     raise RuntimeError(
                         f"*** Unsloth: Failed compiling llama.cpp with {line}. Please report this ASAP!"
                     )
-                print(line, flush = True, end = "")
+                print(line, flush = True, end = "", file=sys.stderr)
             if force_complete and sp.returncode is not None and sp.returncode != 0:
                 raise subprocess.CalledProcessError(sp.returncode, sp.args)
     return None
@@ -960,15 +955,15 @@ def install_llama_cpp_old(version = -10):
 
     # Check if the llama.cpp exists
     if os.path.exists("llama.cpp"):
-        print(
-            "**[WARNING]** You have a llama.cpp directory which is broken.\n"
+        logger.warning(
+            "You have a llama.cpp directory which is broken.\n"
             "Unsloth will DELETE the broken directory and install a new one.\n"
-            "Press CTRL + C / cancel this if this is wrong. We shall wait 30 seconds.\n"
+            "Press CTRL + C / cancel this if this is wrong. We shall wait 30 seconds."
         )
         import time
 
         for i in range(30):
-            print(f"**[WARNING]** Deleting llama.cpp directory... {30-i} seconds left.")
+            logger.warning(f"Deleting llama.cpp directory... {30-i} seconds left.")
             time.sleep(1)
         import shutil
 
@@ -1139,7 +1134,7 @@ def save_to_gguf(
 
     # Determine optimal first_conversion
     if is_gpt_oss:
-        print("Unsloth: GPT-OSS model detected - using special conversion settings")
+        logger.info("GPT-OSS model detected - using special conversion settings")
         first_conversion = "None"  # No quantization for GPT-OSS
         # Only keep one conversion method since GPT-OSS doesn't quantize
         quantization_method = ["None"]
@@ -1184,14 +1179,14 @@ def save_to_gguf(
         f"{chr(92)}        /    [2] Converting GGUF {first_conversion_dtype} to {quantization_method} might take 10 minutes each.\n"
         f' "-____-"     In total, you will have to wait at least 16 minutes.\n'
     )
-    print(print_info)
+    logger.info(print_info)
 
     # Step 1: Ensure llama.cpp is installed
     try:
         quantizer_location, converter_location = check_llama_cpp()
-        print("Unsloth: llama.cpp found in the system. Skipping installation.")
+        logger.info("llama.cpp found in the system. Skipping installation.")
     except:
-        print("Unsloth: Installing llama.cpp. This might take 3 minutes...")
+        logger.info("Installing llama.cpp. This might take 3 minutes...")
         if IS_KAGGLE_ENVIRONMENT:
             # Kaggle: no CUDA support due to environment limitations
             quantizer_location, converter_location = install_llama_cpp(
@@ -1204,17 +1199,17 @@ def save_to_gguf(
             )
 
     # Step 2: Download and patch converter script
-    print("Unsloth: Preparing converter script...")
+    logger.info("Preparing converter script...")
     with use_local_gguf():
         converter_path, supported_text_archs, supported_vision_archs = (
             _download_convert_hf_to_gguf()
         )
 
         # Step 3: Initial GGUF conversion
-        print(
-            f"Unsloth: [1] Converting model into {first_conversion_dtype} GGUF format."
+        logger.info(
+            f"[1] Converting model into {first_conversion_dtype} GGUF format."
         )
-        print(f"This might take 3 minutes...")
+        logger.info(f"This might take 3 minutes...")
 
         initial_files, is_vlm_update = convert_to_gguf(
             model_name = model_name,
@@ -1247,7 +1242,7 @@ def save_to_gguf(
                     "Please check disk space and try again."
                 )
 
-    print(f"Unsloth: Initial conversion completed! Files: {initial_files}")
+    logger.info(f"Initial conversion completed! Files: {initial_files}")
 
     # Step 4: Additional quantizations using llama-quantize
     all_saved_locations = initial_files.copy()
@@ -1263,8 +1258,8 @@ def save_to_gguf(
         quants_created = False
         for quant_method in quantization_method:
             if quant_method != first_conversion:
-                print(
-                    f"Unsloth: [2] Converting GGUF {first_conversion_dtype} into {quant_method}. This might take 10 minutes..."
+                logger.info(
+                    f"[2] Converting GGUF {first_conversion_dtype} into {quant_method}. This might take 10 minutes..."
                 )
                 output_location = f"{model_name}.{quant_method.upper()}.gguf"
 
@@ -1303,7 +1298,7 @@ def save_to_gguf(
                             "Once that's done, redo the quantization.\n"
                             "Error: {e}"
                         )
-        print("Unsloth: Model files cleanup...")
+        logger.info("Model files cleanup...")
         if quants_created:
             all_saved_locations.remove(base_gguf)
             Path(base_gguf).unlink()
@@ -1311,15 +1306,15 @@ def save_to_gguf(
             # flip the list to get [text_model, mmproj] order. for text models stays the same.
             all_saved_locations.reverse()
     else:
-        print("Unsloth: GPT-OSS model - skipping additional quantizations")
+        logger.info("GPT-OSS model - skipping additional quantizations")
 
     if is_gpt_oss:
         want_full_precision = True
     else:
         want_full_precision = first_conversion in frozenset(quantization_method)
 
-    print(f"Unsloth: All GGUF conversions completed successfully!")
-    print(f"Generated files: {all_saved_locations}")
+    logger.info(f"All GGUF conversions completed successfully!")
+    logger.info(f"Generated files: {all_saved_locations}")
 
     return all_saved_locations, want_full_precision, is_vlm
 
@@ -1546,9 +1541,8 @@ def upload_to_huggingface(
 
         ftevent_files = glob.glob("*out.tfevents*", recursive = True)
         if len(ftevent_files) > 0:
-            print(
-                "Unsloth: Uploading tensorboard files... Please wait...",
-                file_location + "*out.tfevents*",
+            logger.info(
+                f"Uploading tensorboard files... Please wait... {file_location}*out.tfevents*"
             )
             for ftevent_file in ftevent_files:
                 hf_api.upload_file(
@@ -1624,14 +1618,14 @@ def create_ollama_modelfile(tokenizer, base_model_name, model_location):
     """
     ollama_template_name = MODEL_TO_OLLAMA_TEMPLATE_MAPPER.get(base_model_name)
     if not ollama_template_name:
-        print(
-            f"Unsloth: No Ollama template mapping found for model '{base_model_name}'. Skipping Ollama Modelfile"
+        logger.warning(
+            f"No Ollama template mapping found for model '{base_model_name}'. Skipping Ollama Modelfile"
         )
         return None
     ollama_modelfile = OLLAMA_TEMPLATES.get(ollama_template_name)
     if not ollama_modelfile:
-        print(
-            f"Unsloth: No Ollama template mapping found for model '{base_model_name}'. Skipping Ollama Modelfile"
+        logger.warning(
+            f"No Ollama template mapping found for model '{base_model_name}'. Skipping Ollama Modelfile"
         )
         return None
     tokenizer._ollama_modelfile = (
@@ -1682,9 +1676,9 @@ def create_ollama_model(username: str, model_name: str, tag: str, modelfile_path
             timeout = 3,
         )
         if init_check.returncode == 0:
-            print(init_check.stdout.strip())
+            logger.info(init_check.stdout.strip())
         else:
-            print("Ollama Server is not Running")
+            logger.warning("Ollama Server is not Running")
     except subprocess.TimeoutExpired:
         return "Ollama Request Timeout"
 
@@ -1704,15 +1698,15 @@ def create_ollama_model(username: str, model_name: str, tag: str, modelfile_path
     )
 
     for line in iter(process.stdout.readline, ""):
-        print(line, end = "")
+        print(line, end = "", file=sys.stderr)
         sys.stdout.flush()
 
     return_code = process.wait()
 
     if return_code != 0:
-        print(f"\nMODEL CREATED FAILED WITH RETURN CODE {return_code}")
+        logger.error(f"MODEL CREATED FAILED WITH RETURN CODE {return_code}")
     else:
-        print("\nMODEL CREATED SUCCESSFULLY")
+        logger.info("MODEL CREATED SUCCESSFULLY")
 
 
 def push_to_ollama_hub(username: str, model_name: str, tag: str):
@@ -1724,9 +1718,9 @@ def push_to_ollama_hub(username: str, model_name: str, tag: str):
             timeout = 3,
         )
         if init_check.returncode == 0:
-            print(init_check.stdout.strip())
+            logger.info(init_check.stdout.strip())
         else:
-            print("Ollama Server is not Running")
+            logger.warning("Ollama Server is not Running")
     except subprocess.TimeoutExpired:
         return "Ollama Request Timeout"
 
@@ -1740,15 +1734,15 @@ def push_to_ollama_hub(username: str, model_name: str, tag: str):
     )
 
     for line in iter(process.stdout.readline, ""):
-        print(line, end = "")
+        print(line, end = "", file=sys.stderr)
         sys.stdout.flush()
 
     return_code = process.wait()
 
     if return_code != 0:
-        print(f"\nMODEL PUBLISHED FAILED WITH RETURN CODE {return_code}")
+        logger.error(f"MODEL PUBLISHED FAILED WITH RETURN CODE {return_code}")
     else:
-        print("\nMODEL PUBLISHED SUCCESSFULLY")
+        logger.info("MODEL PUBLISHED SUCCESSFULLY")
 
 
 def push_to_ollama(tokenizer, gguf_location, username: str, model_name: str, tag: str):
@@ -1769,7 +1763,7 @@ def push_to_ollama(tokenizer, gguf_location, username: str, model_name: str, tag
 
     push_to_ollama_hub(username = username, model_name = model_name, tag = tag)
 
-    print("Successfully pushed to ollama")
+    logger.info("Successfully pushed to ollama")
 
 
 def unsloth_save_pretrained_gguf(
@@ -1888,8 +1882,8 @@ def unsloth_save_pretrained_gguf(
         fix_bos_token, old_chat_template = fix_tokenizer_bos_token(tokenizer)
 
     # Step 4: Save/merge model to 16-bit format
-    print(
-        f'Unsloth: Merging model weights to {"mxfp4" if is_gpt_oss else "16-bit"} format...'
+    logger.info(
+        f'Merging model weights to {"mxfp4" if is_gpt_oss else "16-bit"} format...'
     )
     try:
         # Call unsloth_generic_save directly (it's in the same file)
@@ -1927,11 +1921,11 @@ def unsloth_save_pretrained_gguf(
             raise TypeError("Unsloth: Model dtype can only be float16 or bfloat16")
     except Exception as e:
         # Fallback if dtype_from_config fails
-        print(f"Unsloth: Could not determine dtype ({e}), defaulting to float16")
+        logger.warning(f"Could not determine dtype ({e}), defaulting to float16")
         model_dtype = "float16"
 
     # Step 8: Convert to GGUF format
-    print("Unsloth: Converting to GGUF format...")
+    logger.info("Converting to GGUF format...")
 
     # Convert quantization_method to list if string
     # Use old style quantization_method
@@ -2005,7 +1999,7 @@ def unsloth_save_pretrained_gguf(
                     file.write(modelfile)
                 ollama_success = True
         except Exception as e:
-            print(f"Warning: Could not create Ollama modelfile: {e}")
+            logger.warning(f"Could not create Ollama modelfile: {e}")
 
     # Step 10: Show BOS token warning if applicable
     if fix_bos_token:
@@ -2015,25 +2009,24 @@ def unsloth_save_pretrained_gguf(
         )
 
     if is_vlm_update:
-        print("\n")
-        print(
-            f"Unsloth: example usage for Multimodal LLMs: llama-mtmd-cli -m {all_file_locations[0]} --mmproj {all_file_locations[-1]}"
+        logger.info(
+            f"example usage for Multimodal LLMs: llama-mtmd-cli -m {all_file_locations[0]} --mmproj {all_file_locations[-1]}"
         )
-        print("Unsloth: load image inside llama.cpp runner: /image test_image.jpg")
-        print("Unsloth: Prompt model to describe the image")
+        logger.info("load image inside llama.cpp runner: /image test_image.jpg")
+        logger.info("Prompt model to describe the image")
     else:
-        print(
-            f'Unsloth: example usage for text only LLMs: llama-cli --model {all_file_locations[0]} -p "why is the sky blue?"'
+        logger.info(
+            f'example usage for text only LLMs: llama-cli --model {all_file_locations[0]} -p "why is the sky blue?"'
         )
     if ollama_success and is_vlm_update:
-        print(f"Unsloth: Saved Ollama Modelfile to {modelfile_location}")
-        print(
-            "Unsloth: convert model to ollama format by running - ollama create model_name -f ./Modelfile - inside save directory."
+        logger.info(f"Saved Ollama Modelfile to {modelfile_location}")
+        logger.info(
+            "convert model to ollama format by running - ollama create model_name -f ./Modelfile - inside save directory."
         )
     if ollama_success and not is_vlm_update:
-        print("Unsloth: Saved Ollama Modelfile to current directory")
-        print(
-            "Unsloth: convert model to ollama format by running - ollama create model_name -f ./Modelfile - inside current directory."
+        logger.info("Saved Ollama Modelfile to current directory")
+        logger.info(
+            "convert model to ollama format by running - ollama create model_name -f ./Modelfile - inside current directory."
         )
 
     # Return a dict with all needed info for push_to_hub
@@ -2108,7 +2101,7 @@ def unsloth_push_to_hub_gguf(
         cleanup_temp = False
 
     # Step 2: Call save_pretrained_gguf to do the conversion
-    print(f"Unsloth: Converting model to GGUF format...")
+    logger.info(f"Converting model to GGUF format...")
 
     try:
         # Call save_pretrained_gguf - it returns all the info we need
@@ -2145,7 +2138,7 @@ def unsloth_push_to_hub_gguf(
         raise RuntimeError(f"Failed to convert model to GGUF: {e}")
 
     # Step 3: Upload to HuggingFace Hub
-    print("Unsloth: Uploading GGUF to Huggingface Hub...")
+    logger.info("Uploading GGUF to Huggingface Hub...")
 
     try:
         from huggingface_hub import HfApi
@@ -2184,7 +2177,7 @@ def unsloth_push_to_hub_gguf(
                     os.path.basename(save_directory), model_name
                 )
 
-            print(f"Uploading {proper_name}...")
+            logger.info(f"Uploading {proper_name}...")
 
             api.upload_file(
                 path_or_fileobj = file_location,
@@ -2200,7 +2193,7 @@ def unsloth_push_to_hub_gguf(
         # Upload config.json if exists
         config_path = os.path.join(actual_save_directory, "config.json")
         if os.path.exists(config_path):
-            print("Uploading config.json...")
+            logger.info("Uploading config.json...")
             api.upload_file(
                 path_or_fileobj = config_path,
                 path_in_repo = "config.json",
@@ -2213,7 +2206,7 @@ def unsloth_push_to_hub_gguf(
 
         # Upload Modelfile if exists
         if modelfile_location and os.path.exists(modelfile_location):
-            print("Uploading Ollama Modelfile...")
+            logger.info("Uploading Ollama Modelfile...")
             api.upload_file(
                 path_or_fileobj = modelfile_location,
                 path_in_repo = "Modelfile",
@@ -2294,8 +2287,8 @@ This model was finetuned and converted to GGUF format using [Unsloth](https://gi
             revision = revision,
         )
 
-        print(
-            f"Unsloth: Successfully uploaded GGUF to https://huggingface.co/{full_repo_id}"
+        logger.info(
+            f"Successfully uploaded GGUF to https://huggingface.co/{full_repo_id}"
         )
 
         # Add tags
@@ -2320,7 +2313,7 @@ This model was finetuned and converted to GGUF format using [Unsloth](https://gi
     finally:
         # Clean up temporary directory
         if cleanup_temp and os.path.exists(save_directory):
-            print("Unsloth: Cleaning up temporary files...")
+            logger.info("Cleaning up temporary files...")
             import shutil
 
             try:
@@ -2385,10 +2378,10 @@ def unsloth_convert_lora_to_ggml_and_push_to_hub(
     model_type = self.config.model_type
     output_file = os.path.join(lora_directory_push, "ggml-adapter-model.bin")
 
-    print(
-        f"Unsloth: Converting auto-saved LoRA adapters at {lora_directory_push} to GGML format."
+    logger.info(
+        f"Converting auto-saved LoRA adapters at {lora_directory_push} to GGML format."
     )
-    print(f"The output file will be {output_file}")
+    logger.info(f"The output file will be {output_file}")
 
     command = f"python3 llama.cpp/convert-lora-to-ggml.py {lora_directory_push} {output_file} llama"
 
@@ -2402,19 +2395,19 @@ def unsloth_convert_lora_to_ggml_and_push_to_hub(
             universal_newlines = True,
         ) as sp:
             for line in sp.stdout:
-                print(line, end = "", flush = True)
+                print(line, end = "", flush = True, file=sys.stderr)
             for line in sp.stderr:
-                print(line, end = "", flush = True)
+                print(line, end = "", flush = True, file=sys.stderr)
             sp.wait()
             if sp.returncode != 0:
                 raise subprocess.CalledProcessError(sp.returncode, command)
     except subprocess.CalledProcessError as e:
-        print(f"Error: Conversion failed with return code {e.returncode}")
+        logger.error(f"Conversion failed with return code {e.returncode}")
         return
 
-    print(f"Unsloth: Conversion completed! Output file: {output_file}")
+    logger.info(f"Conversion completed! Output file: {output_file}")
 
-    print("Unsloth: Uploading GGML file to Hugging Face Hub...")
+    logger.info("Uploading GGML file to Hugging Face Hub...")
     username = upload_to_huggingface(
         self,
         repo_id,
@@ -2426,10 +2419,10 @@ def unsloth_convert_lora_to_ggml_and_push_to_hub(
         private,
     )
     link = f"{repo_id.lstrip('/')}"
-    print("Unsloth: Done.")
-    print(f"Converted LoRA to GGML and uploaded to https://huggingface.co/{link}")
-    print(
-        "\nThis GGML making function was made by Maheswar. Ping him @Maheswar on the Unsloth Discord or on HuggingFace (@mahiatlinux) if you like this!"
+    logger.info("Done.")
+    logger.info(f"Converted LoRA to GGML and uploaded to https://huggingface.co/{link}")
+    logger.info(
+        "This GGML making function was made by Maheswar. Ping him @Maheswar on the Unsloth Discord or on HuggingFace (@mahiatlinux) if you like this!"
     )
 
 
@@ -2464,10 +2457,10 @@ def unsloth_convert_lora_to_ggml_and_save_locally(
     model_type = self.config.model_type
     output_file = os.path.join(save_directory, "ggml-adapter-model.bin")
 
-    print(
-        f"Unsloth: Converting auto-saved LoRA adapters at {save_directory} to GGML format."
+    logger.info(
+        f"Converting auto-saved LoRA adapters at {save_directory} to GGML format."
     )
-    print(f"The output file will be {output_file}")
+    logger.info(f"The output file will be {output_file}")
 
     command = f"python3 llama.cpp/convert-lora-to-ggml.py {save_directory} {output_file} llama"
 
@@ -2481,19 +2474,19 @@ def unsloth_convert_lora_to_ggml_and_save_locally(
             universal_newlines = True,
         ) as sp:
             for line in sp.stdout:
-                print(line, end = "", flush = True)
+                print(line, end = "", flush = True, file=sys.stderr)
             for line in sp.stderr:
-                print(line, end = "", flush = True)
+                print(line, end = "", flush = True, file=sys.stderr)
             sp.wait()
             if sp.returncode != 0:
                 raise subprocess.CalledProcessError(sp.returncode, command)
     except subprocess.CalledProcessError as e:
-        print(f"Error: Conversion failed with return code {e.returncode}")
+        logger.error(f"Conversion failed with return code {e.returncode}")
         return
-    print("Unsloth: Done.")
-    print(f"Unsloth: Conversion completed! Output file: {output_file}")
-    print(
-        "\nThis GGML making function was made by Maheswar. Ping him @Maheswar on the Unsloth Discord or on HuggingFace (@mahiatlinux) if you like this!"
+    logger.info("Done.")
+    logger.info(f"Conversion completed! Output file: {output_file}")
+    logger.info(
+        "This GGML making function was made by Maheswar. Ping him @Maheswar on the Unsloth Discord or on HuggingFace (@mahiatlinux) if you like this!"
     )
 
 
@@ -2775,8 +2768,8 @@ def unsloth_save_pretrained_torchao(
     if torchao_config is None:
         from torchao.quantization import Int8DynamicActivationInt8WeightConfig
 
-        print(
-            "Unsloth: You did not specify a `torchao_config`, so defaulting to `Int8DynamicActivationInt8WeightConfig`"
+        logger.info(
+            "You did not specify a `torchao_config`, so defaulting to `Int8DynamicActivationInt8WeightConfig`"
         )
         torchao_config = Int8DynamicActivationInt8WeightConfig()
     quantization_config = TorchAoConfig(quant_type = torchao_config)
@@ -2889,7 +2882,7 @@ def patch_saving_functions(model, vision = False):
     pass
 
     if hasattr(self, "config"):
-        print("Saved model to https://huggingface.co/" + arguments["repo_id"])
+        logger.info("Saved model to https://huggingface.co/" + arguments["repo_id"])
     pass
     '''
     exec(push_to_hub_text, globals())

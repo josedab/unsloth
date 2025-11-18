@@ -22,8 +22,9 @@ from ._utils import (
     get_transformers_model_type,
 )
 from .granite import FastGraniteModel
-from .llama import FastLlamaModel, logger
+from .llama import FastLlamaModel
 from .mistral import FastMistralModel
+from unsloth.logging import logger
 from .qwen2 import FastQwen2Model
 from .qwen3 import FastQwen3Model
 from .qwen3_moe import FastQwen3MoeModel
@@ -207,8 +208,8 @@ class FastLanguageModel(FastLlamaModel):
         # Check if 4bit is allowed specifically for AMD
         if not ALLOW_BITSANDBYTES and not use_exact_model_name:
             if load_in_4bit or load_in_8bit or model_name.lower().endswith("-bnb-4bit"):
-                print(
-                    "Unsloth: AMD currently is not stable with 4bit bitsandbytes. Disabling for now."
+                logger.warning(
+                    "AMD currently is not stable with 4bit bitsandbytes. Disabling for now."
                 )
             load_in_4bit = False
 
@@ -405,14 +406,14 @@ class FastLanguageModel(FastLlamaModel):
                 )
             # Also check for softcapping support in flash-attn which is faster!
             if is_bfloat16_supported() and not HAS_FLASH_ATTENTION:
-                print(
-                    "Unsloth: If you want to finetune Gemma 2, install flash-attn to make it faster!\n"
+                logger.warning(
+                    "If you want to finetune Gemma 2, install flash-attn to make it faster!\n"
                     "To install flash-attn, do the below:\n"
                     '\npip install --no-deps --upgrade "flash-attn>=2.6.3"'
                 )
             elif HAS_FLASH_ATTENTION and not HAS_FLASH_ATTENTION_SOFTCAPPING:
-                print(
-                    "Unsloth: If you want to finetune Gemma 2, upgrade flash-attn to version 2.6.3 or higher!\n"
+                logger.warning(
+                    "If you want to finetune Gemma 2, upgrade flash-attn to version 2.6.3 or higher!\n"
                     "Newer versions support faster and less memory usage kernels for Gemma 2's attention softcapping!\n"
                     "To update flash-attn, do the below:\n"
                     '\npip install --no-deps --upgrade "flash-attn>=2.6.3"'
@@ -665,8 +666,8 @@ class FastModel(FastBaseModel):
         patch_compiling_bitsandbytes()
 
         if full_finetuning and (load_in_4bit or load_in_8bit):
-            print(
-                "Unsloth: You selected full finetuning support, but 4bit / 8bit is enabled - disabling LoRA / QLoRA."
+            logger.warning(
+                "You selected full finetuning support, but 4bit / 8bit is enabled - disabling LoRA / QLoRA."
             )
             load_in_4bit = False
             load_in_8bit = False
@@ -689,8 +690,8 @@ class FastModel(FastBaseModel):
         # Check if 4bit is allowed specifically for AMD
         if not ALLOW_BITSANDBYTES and not use_exact_model_name:
             if load_in_4bit or load_in_8bit or model_name.lower().endswith("-bnb-4bit"):
-                print(
-                    "Unsloth: AMD currently is not stable with 4bit bitsandbytes. Disabling for now."
+                logger.warning(
+                    "AMD currently is not stable with 4bit bitsandbytes. Disabling for now."
                 )
             load_in_4bit = False
 
@@ -1148,7 +1149,7 @@ class FastModel(FastBaseModel):
 
         # Apply QAT if specified
         if qat_scheme is not None:
-            print("Unsloth: Applying QAT to mitigate quantization degradation")
+            logger.info("Applying QAT to mitigate quantization degradation")
             model = FastModel._prepare_for_qat(model, qat_scheme)
 
         # Patch Tiled MLP

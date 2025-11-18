@@ -95,7 +95,7 @@ from ..device_type import (
     DEVICE_COUNT,
     ALLOW_PREQUANTIZED_MODELS,
 )
-from unsloth_zoo.log import logger
+from unsloth.logging import logger
 from unsloth_zoo.tokenizer_utils import (
     patch_tokenizer as _patch_tokenizer,
 )
@@ -629,7 +629,7 @@ if is_openai_available():
     try:
         from openai import OpenAI
     except:
-        print("Unsloth: OpenAI failed to import - ignoring for now.")
+        logger.warning("OpenAI failed to import - ignoring for now.")
         import transformers.utils
 
         def _is_openai_available():
@@ -671,15 +671,15 @@ if DEVICE_TYPE == "cuda":
                     flash_attn_version
                 ) >= Version("2.6.3")
                 if not HAS_FLASH_ATTENTION_SOFTCAPPING:
-                    print(
-                        "Unsloth: If you want to finetune Gemma 2, upgrade flash-attn to version 2.6.3 or higher!\n"
+                    logger.warning(
+                        "If you want to finetune Gemma 2, upgrade flash-attn to version 2.6.3 or higher!\n"
                         "Newer versions support faster and less memory usage kernels for Gemma 2's attention softcapping!\n"
                         "To update flash-attn, do the below:\n"
                         '\npip install --no-deps --no-build-isolation --upgrade "flash-attn>=2.6.3"'
                     )
             except:
-                print(
-                    "Unsloth: Your Flash Attention 2 installation seems to be broken?\n"
+                logger.warning(
+                    "Your Flash Attention 2 installation seems to be broken?\n"
                     "A possible explanation is you have a new CUDA version which isn't\n"
                     "yet compatible with FA2? Please file a ticket to Unsloth or FA2.\n"
                     "We shall now use Xformers instead, which does not have any performance hits!\n"
@@ -723,15 +723,15 @@ elif DEVICE_TYPE == "hip":
                 "2.6.3"
             )
             if not HAS_FLASH_ATTENTION_SOFTCAPPING:
-                print(
-                    "Unsloth: If you want to finetune Gemma 2, upgrade flash-attn to version 2.6.3 or higher!\n"
+                logger.warning(
+                    "If you want to finetune Gemma 2, upgrade flash-attn to version 2.6.3 or higher!\n"
                     "Newer versions support faster and less memory usage kernels for Gemma 2's attention softcapping!\n"
                     "To update flash-attn, do the below:\n"
                     '\npip install --no-deps --no-build-isolation --upgrade "flash-attn>=2.6.3"'
                 )
         except:
-            print(
-                "Unsloth: Your Flash Attention 2 installation seems to be broken?\n"
+            logger.warning(
+                "Your Flash Attention 2 installation seems to be broken?\n"
                 "A possible explanation is you have a new CUDA version which isn't\n"
                 "yet compatible with FA2? Please file a ticket to Unsloth or FA2.\n"
                 "We shall now use Xformers instead, which does not have any performance hits!\n"
@@ -828,10 +828,10 @@ except ModuleNotFoundError:
     xformers_attention = None
     xformers_version = None
 except Exception as e:
-    print(
-        "========\nSwitching to PyTorch attention since your Xformers is broken.\n========\n"
+    logger.warning(
+        "Switching to PyTorch attention since your Xformers is broken."
     )
-    print(str(e))
+    logger.warning(str(e))
     xformers = None
     xformers_attention = None
     xformers_version = None
@@ -944,7 +944,7 @@ import accelerate
 
 
 def torch_compile_kwargs(*args, **kwargs):
-    print("Unsloth: Enabled auto compiling")
+    logger.info("Enabled auto compiling")
     return {
         "dynamic": True,
         "fullgraph": False,
@@ -1835,17 +1835,15 @@ def unsloth_compile_transformers(
     unsloth_force_compile = False,
 ):
     if Version(torch_version) < Version("2.4.0"):
-        print(
-            "="
-            * 30
-            + "Unsloth: Unfortunately Unsloth vision and other newer optimized models need Torch 2.4 or later.\n"
+        logger.warning(
+            "Unfortunately Unsloth vision and other newer optimized models need Torch 2.4 or later.\n"
             f"You have Torch version {torch_version}. Please upgrade your Torch version by visiting https://pytorch.org/\n"
             "For now your models will not get optimized, but will still work for now!"
         )
         return
     if trust_remote_code and unsloth_force_compile == False:
-        print(
-            "Unsloth: We can't trace models if `trust_remote_code = True`, "
+        logger.warning(
+            "We can't trace models if `trust_remote_code = True`, "
             "so turning off some optimizations!"
         )
         return model_types, False
@@ -1931,7 +1929,7 @@ functions = dir(torch.Tensor)
 for j, function in enumerate(functions):
     if function.startswith("__") and function.endswith("__"):
         exec(
-            f"def raise_{j}(*args, **kwargs): print('{function}')", globals(), locals()
+            f"def raise_{j}(*args, **kwargs): logger.debug('{function}')", globals(), locals()
         )
         try:
             exec(f"EMPTY_LOGITS.{function} = raise_{j}", globals(), locals())
@@ -2047,7 +2045,7 @@ try:
     try:
         from torchao.quantization import Int4WeightOnlyConfig
     except:
-        print("Unsloth: TorchAO changed `torchao.quantization.Int4WeightOnlyConfig`")
+        logger.warning("TorchAO changed `torchao.quantization.Int4WeightOnlyConfig`")
         Int4WeightOnlyConfig = None
 except:
     AOBaseConfig = None
