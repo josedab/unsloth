@@ -118,12 +118,118 @@ def from_pretrained(model_name, **kwargs):
 
 ---
 
+## Example Usage
+
+### User Configuration
+
+```python
+import logging
+from unsloth.logging import configure_logging
+
+# Verbose debugging
+configure_logging(level=logging.DEBUG)
+
+# Quiet mode (warnings only)
+configure_logging(level=logging.WARNING)
+
+# Custom format
+configure_logging(
+    format="[%(levelname)s] %(message)s"
+)
+```
+
+### Environment Variable Control
+
+```bash
+# Set log level
+export UNSLOTH_LOG_LEVEL=DEBUG  # or INFO, WARNING, ERROR
+
+# Disable all Unsloth logging
+export UNSLOTH_LOG_LEVEL=CRITICAL
+```
+
+---
+
+## Backwards Compatibility
+
+### Breaking Changes
+
+**Potential issue:** Users who parse stdout for Unsloth messages.
+
+**Mitigation:**
+- Log to stderr by default (stdout unchanged)
+- Provide migration guide for parsing structured logs
+
+### Deprecation Period
+
+- Version N: Add logging, keep prints as fallback
+- Version N+1: Remove prints, logging only
+
+---
+
+## Alternatives Considered
+
+### Alternative 1: Use `warnings.warn()`
+
+**Rejected:** Only for warnings, not info/debug. Less flexible than logging.
+
+### Alternative 2: Custom Print Wrapper
+
+**Rejected:** Reinvents logging. No structured data support.
+
+### Alternative 3: Third-Party Library (loguru, structlog)
+
+**Rejected:** Adds dependency. Different API from stdlib.
+
+---
+
+## Open Questions
+
+1. **Should we add JSON logging format?** Useful for log aggregation systems.
+
+2. **Should we include correlation IDs?** Useful for tracing multi-model operations.
+
+3. **How to handle progress bars?** tqdm outputs to stderr, may conflict.
+
+---
+
 ## Success Criteria
 
 - [ ] 0 `print()` statements for user messaging
 - [ ] All messages use appropriate log levels
 - [ ] Log filtering works via environment variable
 - [ ] Structured data in log messages
+- [ ] No performance regression
+
+### Measurable Outcomes
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Print statements | ~550 | 0 |
+| User log control | None | Full filtering |
+| Structured data | No | Yes |
+
+---
+
+## Required Approvals
+
+- [ ] Maintainer review
+- [ ] User experience testing
+
+---
+
+## Rollback Strategy
+
+1. Logging module can be disabled via environment variable
+2. Can revert individual file changes
+3. No data migration needed
+
+---
+
+## References
+
+- Python Logging HOWTO: https://docs.python.org/3/howto/logging.html
+- Twelve-Factor App Logging: https://12factor.net/logs
 
 ---
 
