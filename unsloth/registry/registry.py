@@ -1,9 +1,33 @@
+"""
+Core registry types and functions for model management.
+
+This module defines the data structures and functions used to manage
+the Unsloth model registry. It includes the QuantType enum, ModelInfo
+dataclass, and registration functions.
+"""
+
 import warnings
 from dataclasses import dataclass, field
 from enum import Enum
 
 
 class QuantType(Enum):
+    """
+    Enumeration of supported quantization types for models.
+
+    Attributes:
+        BNB: Standard bitsandbytes 4-bit quantization.
+        UNSLOTH: Unsloth dynamic 4-bit quantization (optimized).
+        GGUF: GGUF format for llama.cpp.
+        NONE: No quantization (full precision).
+        BF16: BFloat16 precision (used for models like DeepSeek V3).
+
+    Example:
+        >>> from unsloth.registry import QuantType
+        >>> quant = QuantType.BNB
+        >>> print(quant.value)
+        'bnb'
+    """
     BNB = "bnb"
     UNSLOTH = "unsloth"  # dynamic 4-bit quantization
     GGUF = "GGUF"
@@ -29,6 +53,37 @@ QUANT_TAG_MAP = {
 # NOTE: models registered with org="unsloth" and QUANT_TYPE.NONE are aliases of QUANT_TYPE.UNSLOTH
 @dataclass
 class ModelInfo:
+    """
+    Data class containing metadata for a registered model.
+
+    This class stores information about a model in the registry, including
+    its organization, base name, version, size, and quantization type.
+    It provides methods for constructing model names and paths.
+
+    Attributes:
+        org: Organization or namespace (e.g., "unsloth", "meta-llama").
+        base_name: Base model name (e.g., "Llama", "Mistral").
+        version: Model version (e.g., "3.2", "2").
+        size: Model size in billions of parameters.
+        name: Full model name. Auto-generated if not provided.
+        is_multimodal: Whether the model supports multiple modalities.
+        instruct_tag: Instruction tuning tag (e.g., "Instruct").
+        quant_type: Quantization type from QuantType enum.
+        description: Optional description of the model.
+
+    Example:
+        >>> from unsloth.registry import ModelInfo, QuantType
+        >>> model = ModelInfo(
+        ...     org="unsloth",
+        ...     base_name="Llama",
+        ...     version="3.2",
+        ...     size=8,
+        ...     instruct_tag="Instruct",
+        ...     quant_type=QuantType.BNB,
+        ... )
+        >>> print(model.model_path)
+        unsloth/Llama-3.2-8B-Instruct-bnb-4bit
+    """
     org: str
     base_name: str
     version: str

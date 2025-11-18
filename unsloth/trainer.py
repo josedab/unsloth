@@ -12,6 +12,52 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Training utilities for Unsloth optimized models.
+
+This module provides custom trainer classes and training utilities that work
+seamlessly with Unsloth-optimized models. It includes support for different
+learning rates for embeddings, gradient accumulation fixes, and backward
+compatibility with different TRL versions.
+
+The primary components are:
+
+- :class:`UnslothTrainer`: Custom SFTTrainer with embedding learning rate support
+- :class:`UnslothTrainingArguments`: Extended training arguments
+- :func:`unsloth_train`: Wrapper function for training with gradient accumulation fixes
+
+Example:
+    Basic training setup::
+
+        from unsloth import FastLanguageModel, UnslothTrainer, UnslothTrainingArguments
+
+        # Load model
+        model, tokenizer = FastLanguageModel.from_pretrained(...)
+        model = FastLanguageModel.get_peft_model(model, ...)
+
+        # Configure training
+        training_args = UnslothTrainingArguments(
+            output_dir="./output",
+            per_device_train_batch_size=2,
+            gradient_accumulation_steps=4,
+            learning_rate=2e-4,
+            embedding_learning_rate=1e-5,  # Lower LR for embeddings
+        )
+
+        # Create trainer and train
+        trainer = UnslothTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=dataset,
+            tokenizer=tokenizer,
+        )
+        trainer.train()
+
+See Also:
+    - :mod:`unsloth.models.loader`: For loading models
+    - :mod:`unsloth.save`: For saving trained models
+"""
+
 import warnings
 from dataclasses import dataclass, field
 from typing import Optional
@@ -44,11 +90,54 @@ from transformers import __version__ as transformers_version
 if Version(transformers_version) > Version("4.45.2"):
 
     def unsloth_train(trainer, *args, **kwargs):
+        """
+        Train a model using the Unsloth-optimized training loop.
+
+        This function wraps the trainer's train method, automatically applying
+        gradient accumulation fixes for older transformers versions.
+
+        Args:
+            trainer: An UnslothTrainer or SFTTrainer instance.
+            *args: Additional positional arguments passed to trainer.train().
+            **kwargs: Additional keyword arguments passed to trainer.train().
+
+        Returns:
+            The training output from trainer.train().
+
+        Example:
+            >>> trainer = UnslothTrainer(model=model, args=args, ...)
+            >>> stats = unsloth_train(trainer)
+
+        Note:
+            For transformers > 4.45.2, this simply calls trainer.train().
+            For older versions, it applies gradient accumulation fixes.
+        """
         return trainer.train(*args, **kwargs)
 
 else:
 
     def unsloth_train(trainer, *args, **kwargs):
+        """
+        Train a model using the Unsloth-optimized training loop.
+
+        This function wraps the trainer's train method, automatically applying
+        gradient accumulation fixes for older transformers versions.
+
+        Args:
+            trainer: An UnslothTrainer or SFTTrainer instance.
+            *args: Not supported in older transformers versions.
+            **kwargs: Not supported in older transformers versions.
+
+        Returns:
+            The training output from the custom training loop.
+
+        Raises:
+            RuntimeError: If args or kwargs are provided with older transformers.
+
+        Note:
+            For transformers <= 4.45.2, additional arguments are not supported.
+            Consider upgrading transformers to use the full feature set.
+        """
         if len(args) != 0 or len(kwargs) != 0:
             raise RuntimeError(
                 "Unsloth: Our custom gradient accumulation fixed trainer does not support other arguments.\n"
@@ -70,6 +159,39 @@ except:
 
 
 class UnslothTrainingArguments(TrainingArguments):
+    """
+    Extended training arguments with support for embedding-specific learning rates.
+
+    This class extends the standard TrainingArguments (or SFTConfig for TRL >= 0.13)
+    to add support for setting a different learning rate for embedding layers.
+    This is useful when training models with newly added tokens.
+
+    Args:
+        embedding_learning_rate: Learning rate specifically for embedding layers.
+            If None, uses the same learning rate as other parameters.
+            Typically set lower than the main learning rate (e.g., 1e-5 vs 2e-4).
+        *args: Additional positional arguments passed to TrainingArguments.
+        **kwargs: Additional keyword arguments passed to TrainingArguments.
+
+    Example:
+        >>> from unsloth import UnslothTrainingArguments
+        >>> args = UnslothTrainingArguments(
+        ...     output_dir="./output",
+        ...     learning_rate=2e-4,
+        ...     embedding_learning_rate=1e-5,
+        ...     per_device_train_batch_size=2,
+        ...     gradient_accumulation_steps=4,
+        ...     num_train_epochs=3,
+        ... )
+
+    Note:
+        The embedding_learning_rate only takes effect when using UnslothTrainer
+        and when embeddings are marked as trainable (e.g., after adding new tokens).
+
+    See Also:
+        - :class:`UnslothTrainer`: Trainer that uses these arguments
+        - :func:`FastLanguageModel.get_peft_model`: For adding trainable embeddings
+    """
     def __init__(self, embedding_learning_rate: float = None, *args, **kwargs):
         embedding_learning_rate = embedding_learning_rate
         super().__init__(*args, **kwargs)
@@ -81,6 +203,25 @@ def _create_unsloth_optimizer(
     optimizer_kwargs,
     embedding_lr = 5e-5,
 ):
+    """
+    Create an optimizer with separate learning rates for embeddings.
+
+    This internal function creates an optimizer that applies a different
+    learning rate to embedding parameters compared to other model parameters.
+    Embedding parameters are identified by the suffix "modules_to_save.default.weight".
+
+    Args:
+        model: The model to create an optimizer for.
+        optimizer_cls: The optimizer class to instantiate (e.g., AdamW).
+        optimizer_kwargs: Keyword arguments for the optimizer including 'lr'.
+        embedding_lr: Learning rate for embedding parameters. Default: 5e-5.
+
+    Returns:
+        An optimizer instance with parameter groups for embeddings and non-embeddings.
+
+    Note:
+        This is an internal function used by UnslothTrainer.create_optimizer().
+    """
     lr = optimizer_kwargs["lr"]
     weight_decay = optimizer_kwargs.get("weight_decay", 0.0)
 
@@ -119,7 +260,56 @@ def _create_unsloth_optimizer(
 
 
 class UnslothTrainer(SFTTrainer):
+    """
+    Custom trainer with support for embedding-specific learning rates.
+
+    UnslothTrainer extends TRL's SFTTrainer to support different learning rates
+    for embedding layers. This is useful when finetuning models with newly added
+    tokens, where embeddings should be trained with a lower learning rate.
+
+    The trainer automatically detects embedding parameters (those ending with
+    "modules_to_save.default.weight") and applies the embedding_learning_rate
+    specified in UnslothTrainingArguments.
+
+    Example:
+        >>> from unsloth import FastLanguageModel, UnslothTrainer, UnslothTrainingArguments
+        >>>
+        >>> # Load and prepare model
+        >>> model, tokenizer = FastLanguageModel.from_pretrained(...)
+        >>> model = FastLanguageModel.get_peft_model(model, ...)
+        >>>
+        >>> # Configure training with embedding LR
+        >>> args = UnslothTrainingArguments(
+        ...     output_dir="./output",
+        ...     learning_rate=2e-4,
+        ...     embedding_learning_rate=1e-5,
+        ... )
+        >>>
+        >>> # Create trainer
+        >>> trainer = UnslothTrainer(
+        ...     model=model,
+        ...     args=args,
+        ...     train_dataset=dataset,
+        ...     tokenizer=tokenizer,
+        ... )
+        >>> trainer.train()
+
+    See Also:
+        - :class:`UnslothTrainingArguments`: Training arguments with embedding_learning_rate
+        - :func:`unsloth_train`: Wrapper for training with gradient accumulation fixes
+    """
+
     def create_optimizer(self):
+        """
+        Create optimizer with optional separate embedding learning rate.
+
+        This method overrides the default optimizer creation to support
+        different learning rates for embedding parameters when
+        embedding_learning_rate is specified in the training arguments.
+
+        Returns:
+            The optimizer instance, either standard or with embedding parameter groups.
+        """
         embedding_learning_rate = getattr(self.args, "embedding_learning_rate", None)
         if embedding_learning_rate is None:
             return super().create_optimizer()
@@ -140,6 +330,23 @@ class UnslothTrainer(SFTTrainer):
 # From `trl>=0.13.0`, they changed how to pass several params to the trainer
 # We need to patch to make the transition smooth
 def _backwards_compatible_trainer(trainer_class, config_class):
+    """
+    Create a backwards-compatible trainer initializer for TRL version changes.
+
+    TRL >= 0.13.0 changed how parameters are passed to trainers, moving many
+    arguments from the trainer constructor to config classes. This function
+    creates a wrapper that automatically handles the transition.
+
+    Args:
+        trainer_class: The TRL trainer class to patch (e.g., SFTTrainer).
+        config_class: The corresponding config class (e.g., SFTConfig).
+
+    Returns:
+        A new __init__ method that handles both old and new TRL API styles.
+
+    Note:
+        This is an internal function used by _patch_trl_trainer().
+    """
     original_init = trainer_class.__init__
 
     @wraps(original_init)
@@ -212,6 +419,27 @@ def _backwards_compatible_trainer(trainer_class, config_class):
 
 
 def _patch_trl_trainer():
+    """
+    Patch TRL trainers for backwards compatibility across versions.
+
+    This function patches all TRL trainer classes to support both old and new
+    API styles, allowing users to use the same code across different TRL versions.
+    It's called automatically when importing unsloth.
+
+    The function:
+    1. Finds all TRL trainer/config pairs
+    2. Patches each trainer's __init__ to handle both old and new argument styles
+    3. Sets a flag to prevent double-patching
+
+    Note:
+        - Only patches TRL versions > 0.11.0
+        - Sets trl.__UNSLOTH_BACKWARDS_COMPATIBLE__ = True when complete
+        - Safe to call multiple times (no-op if already patched)
+
+    Example:
+        >>> from unsloth.trainer import _patch_trl_trainer
+        >>> _patch_trl_trainer()  # Now TRL trainers accept both old and new APIs
+    """
     import trl
 
     if hasattr(trl, "__UNSLOTH_BACKWARDS_COMPATIBLE__"):

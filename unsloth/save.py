@@ -12,6 +12,63 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Model saving and export utilities for Unsloth.
+
+This module provides functions for saving trained models in various formats
+including LoRA adapters, merged 16-bit weights, merged 4-bit weights, and
+GGUF format for llama.cpp. It also supports pushing models to HuggingFace Hub.
+
+The primary functions are:
+
+- :func:`unsloth_save_model`: Save models in LoRA, merged 16-bit, or merged 4-bit format
+- :func:`save_to_gguf`: Export models to GGUF format for llama.cpp
+- :func:`print_quantization_methods`: Display available GGUF quantization options
+- :func:`create_huggingface_repo`: Create a repository on HuggingFace Hub
+
+Example:
+    Saving a LoRA adapter::
+
+        from unsloth import FastLanguageModel
+
+        model, tokenizer = FastLanguageModel.from_pretrained(...)
+        # ... train model ...
+
+        # Save LoRA weights only (fastest)
+        model.save_pretrained("./lora_model")
+
+    Saving merged 16-bit weights::
+
+        # Merge LoRA and save full model
+        model.save_pretrained_merged(
+            "merged_model",
+            tokenizer,
+            save_method="merged_16bit",
+        )
+
+    Exporting to GGUF::
+
+        # Save as GGUF for llama.cpp
+        model.save_pretrained_gguf(
+            "model",
+            tokenizer,
+            quantization_method="q4_k_m",
+        )
+
+    Pushing to HuggingFace Hub::
+
+        model.push_to_hub_merged(
+            "username/model-name",
+            tokenizer,
+            save_method="merged_16bit",
+            token="hf_xxxxx",
+        )
+
+See Also:
+    - :mod:`unsloth.models.loader`: For loading models
+    - :mod:`unsloth.trainer`: For training models
+"""
+
 from unsloth_zoo.utils import Version
 from importlib.metadata import version as importlib_version
 from unsloth_zoo.hf_utils import dtype_from_config, HAS_TORCH_DTYPE
@@ -131,6 +188,29 @@ ALLOWED_QUANTS = {
 
 
 def print_quantization_methods():
+    """
+    Print all available GGUF quantization methods with descriptions.
+
+    This function displays a list of all supported quantization methods
+    for GGUF export, along with brief descriptions of their characteristics
+    including speed, quality, and file size trade-offs.
+
+    Example:
+        >>> from unsloth import print_quantization_methods
+        >>> print_quantization_methods()
+        "not_quantized"  ==> Recommended. Fast conversion. Slow inference, big files.
+        "fast_quantized"  ==> Recommended. Fast conversion. OK inference, OK file size.
+        ...
+
+    Note:
+        Recommended methods for most use cases:
+        - "q4_k_m": Good balance of size and quality
+        - "q5_k_m": Higher quality, slightly larger
+        - "q8_0": Highest quality quantized format
+
+    See Also:
+        - :func:`save_to_gguf`: Export models to GGUF format
+    """
     for key, value in ALLOWED_QUANTS.items():
         print(f'"{key}"  ==> {value}')
 
@@ -250,6 +330,78 @@ def unsloth_save_model(
     temporary_location: str = "_unsloth_temporary_saved_buffers",
     maximum_memory_usage: float = 0.9,
 ):
+    """
+    Save a trained model in various formats with optional HuggingFace Hub upload.
+
+    This function provides a unified interface for saving models trained with
+    Unsloth. It supports three save methods: LoRA adapters only, merged 16-bit
+    weights, and merged 4-bit weights. Models can be saved locally or pushed
+    directly to HuggingFace Hub.
+
+    Args:
+        model: The trained model to save (can be a PeftModel or base model).
+        tokenizer: The tokenizer associated with the model.
+        save_directory: Local path or HuggingFace Hub repo ID to save to.
+        save_method: How to save the model. Options:
+            - "lora": Save only LoRA adapter weights (fastest, smallest)
+            - "merged_16bit": Merge LoRA into base model, save in 16-bit (required for GGUF)
+            - "merged_4bit": Merge LoRA into 4-bit model (smallest merged size)
+        push_to_hub: Whether to push the model to HuggingFace Hub.
+        token: HuggingFace API token. Required if push_to_hub=True.
+        is_main_process: Whether this is the main process (for distributed training).
+        state_dict: Optional custom state dict to save.
+        save_function: Function to use for saving (default: torch.save).
+        max_shard_size: Maximum size of each shard when saving. Default: "5GB".
+        safe_serialization: Use safetensors format. Default: True.
+        variant: Optional model variant name.
+        save_peft_format: Save in PEFT format for LoRA. Default: True.
+        use_temp_dir: Use temporary directory for Hub upload.
+        commit_message: Commit message for Hub upload.
+        private: Make the Hub repo private.
+        create_pr: Create a pull request instead of direct commit.
+        revision: Branch/revision for Hub upload.
+        commit_description: Description for Hub commit.
+        tags: List of tags to add to the model.
+        temporary_location: Temp directory for intermediate saves.
+        maximum_memory_usage: Max GPU memory fraction to use (0.0-0.95).
+
+    Returns:
+        tuple: (save_directory, final_location) or just save_directory for Hub uploads.
+
+    Raises:
+        RuntimeError: If save_method is invalid or push_to_hub without token.
+        ValueError: If merged_4bit is used (requires explicit confirmation).
+
+    Example:
+        Save LoRA adapters only::
+
+            unsloth_save_model(
+                model,
+                tokenizer,
+                "./lora_output",
+                save_method="lora",
+            )
+
+        Save merged model and push to Hub::
+
+            unsloth_save_model(
+                model,
+                tokenizer,
+                "username/my-model",
+                save_method="merged_16bit",
+                push_to_hub=True,
+                token="hf_xxxxx",
+            )
+
+    Note:
+        - "merged_4bit" will show a warning about potential quality loss
+        - Use "merged_4bit_forced" to skip the warning
+        - For GGUF export, use "merged_16bit" then save_to_gguf()
+
+    See Also:
+        - :func:`save_to_gguf`: Export to GGUF format
+        - :func:`print_quantization_methods`: View GGUF quantization options
+    """
     if token is None:
         token = get_token()
 

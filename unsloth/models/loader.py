@@ -12,6 +12,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Model loading utilities for Unsloth.
+
+This module provides the main entry points for loading pre-trained language models
+with Unsloth optimizations. It includes support for various model architectures
+including Llama, Mistral, Qwen, Gemma, and vision-language models.
+
+The primary classes are:
+
+- :class:`FastLanguageModel`: Main entry point for loading text-only language models
+- :class:`FastModel`: General-purpose model loader with support for vision models
+- :class:`FastVisionModel`: Alias for FastModel, specialized for vision-language models
+- :class:`FastTextModel`: Alias for FastModel, specialized for text models
+
+Example:
+    Basic usage for loading a language model::
+
+        from unsloth import FastLanguageModel
+
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            "unsloth/Llama-3.2-1B-Instruct",
+            max_seq_length=2048,
+            load_in_4bit=True,
+        )
+
+    Loading a vision model::
+
+        from unsloth import FastVisionModel
+
+        model, tokenizer = FastVisionModel.from_pretrained(
+            "unsloth/Llama-3.2-11B-Vision-Instruct-bnb-4bit",
+            max_seq_length=2048,
+        )
+
+Note:
+    Always import unsloth before other libraries to ensure patches are applied::
+
+        import unsloth  # Must be first!
+        from transformers import ...
+
+See Also:
+    - :mod:`unsloth.save`: For saving and exporting models
+    - :mod:`unsloth.trainer`: For training with UnslothTrainer
+"""
+
 from ._utils import (
     _prepare_model_for_qat,
     is_bfloat16_supported,
@@ -113,6 +158,23 @@ DISABLE_SDPA_MODEL_NAMES = [
 
 
 class FastLanguageModel(FastLlamaModel):
+    """
+    Main entry point for loading language models with Unsloth optimizations.
+
+    This class provides optimized loading and inference for various language model
+    architectures including Llama, Mistral, Qwen, Gemma, and more. It automatically
+    applies Flash Attention, optimized Triton kernels, and memory-efficient
+    gradient checkpointing.
+
+    The class supports loading models in various quantization formats (4-bit, 8-bit,
+    16-bit) and can automatically select the best pre-quantized model variant from
+    the Unsloth model hub.
+
+    See Also:
+        - :meth:`get_peft_model`: Apply LoRA adapters after loading
+        - :class:`FastModel`: For vision-language models
+    """
+
     @staticmethod
     def from_pretrained(
         model_name = "unsloth/Llama-3.2-1B-Instruct",
@@ -143,6 +205,122 @@ class FastLanguageModel(FastLlamaModel):
         *args,
         **kwargs,
     ):
+        """
+        Load a pre-trained language model with Unsloth optimizations.
+
+        This method loads a HuggingFace model and applies Unsloth optimizations
+        including Flash Attention, optimized Triton kernels, and memory-efficient
+        gradient checkpointing. It supports loading from the Unsloth model hub,
+        HuggingFace Hub, or local paths.
+
+        Args:
+            model_name: HuggingFace model ID (e.g., "unsloth/Llama-3.2-1B-Instruct")
+                or local path to model directory. Unsloth will automatically find
+                the best pre-quantized variant if available.
+            max_seq_length: Maximum sequence length for training/inference. Longer
+                sequences use more memory. If None, uses model's default from config.
+            dtype: Data type for model weights. Options: torch.float16, torch.bfloat16,
+                torch.float32, or string "float16"/"bfloat16". If None, auto-detects
+                based on GPU capability (bfloat16 for Ampere+, float16 otherwise).
+            load_in_4bit: Load model in 4-bit quantization using bitsandbytes.
+                Reduces memory by ~75% with minimal quality loss. Default: True.
+            load_in_8bit: Load model in 8-bit quantization. Less compression than
+                4-bit but higher quality. Cannot be combined with load_in_4bit.
+            load_in_16bit: Load model in 16-bit precision without quantization.
+                Required for full finetuning without LoRA.
+            full_finetuning: Enable full model finetuning instead of LoRA.
+                Requires more memory but can achieve better results.
+            token: HuggingFace API token for private models. If None, uses
+                cached token from huggingface-cli login.
+            device_map: Device placement strategy. Options: "sequential" (default),
+                "auto", or custom dict. "sequential" fills GPUs in order.
+            rope_scaling: RoPE scaling configuration for extended context.
+                Pass a dict with "type" and "factor" keys.
+            fix_tokenizer: Automatically fix common tokenizer issues like
+                missing pad tokens. Default: True.
+            trust_remote_code: Allow loading models with custom code from
+                HuggingFace Hub. Required for some model architectures.
+            use_gradient_checkpointing: Gradient checkpointing strategy.
+                Options: "unsloth" (optimized, default), True (standard), False.
+            resize_model_vocab: Resize model vocabulary to this size.
+                Useful when adding new tokens.
+            revision: Specific model revision/commit to load from HuggingFace Hub.
+            use_exact_model_name: Skip automatic model name resolution to
+                pre-quantized variants. Use exact model_name as provided.
+            offload_embedding: Offload embedding layers to CPU to save GPU memory.
+            float32_mixed_precision: Force float32 mixed precision for certain
+                operations. Useful for stability on some models.
+            fast_inference: Enable vLLM backend for faster inference.
+                Requires vLLM to be installed.
+            gpu_memory_utilization: GPU memory fraction to use when fast_inference
+                is enabled. Range: 0.0 to 1.0. Default: 0.5.
+            float8_kv_cache: Use float8 KV cache for reduced memory during inference.
+            random_state: Random seed for reproducibility. Default: 3407.
+            max_lora_rank: Maximum LoRA rank for fast inference. Default: 64.
+            disable_log_stats: Disable logging statistics during inference.
+            qat_scheme: Quantization-Aware Training scheme. Options: None,
+                "int4_weight_int8_dynamic_activation_asymmetric".
+            *args: Additional positional arguments passed to the underlying loader.
+            **kwargs: Additional keyword arguments passed to
+                AutoModelForCausalLM.from_pretrained().
+
+        Returns:
+            tuple: A tuple of (model, tokenizer) where:
+                - model: The loaded and optimized model ready for training/inference
+                - tokenizer: The associated tokenizer with proper configuration
+
+        Raises:
+            ValueError: If model_name is not a supported architecture.
+            RuntimeError: If model loading fails due to memory, network issues,
+                or incompatible configurations.
+            ImportError: If required dependencies (e.g., vLLM for fast_inference)
+                are not installed or transformers version is too old.
+
+        Example:
+            Basic 4-bit QLoRA setup::
+
+                from unsloth import FastLanguageModel
+
+                model, tokenizer = FastLanguageModel.from_pretrained(
+                    "unsloth/Llama-3.2-1B-Instruct",
+                    max_seq_length=2048,
+                    load_in_4bit=True,
+                )
+
+            Full precision with custom dtype::
+
+                model, tokenizer = FastLanguageModel.from_pretrained(
+                    "meta-llama/Llama-3.2-1B",
+                    dtype=torch.bfloat16,
+                    load_in_4bit=False,
+                    load_in_16bit=True,
+                )
+
+            Loading a private model::
+
+                model, tokenizer = FastLanguageModel.from_pretrained(
+                    "my-org/private-model",
+                    token="hf_xxxxx",
+                    trust_remote_code=True,
+                )
+
+            With fast inference (requires vLLM)::
+
+                model, tokenizer = FastLanguageModel.from_pretrained(
+                    "unsloth/Llama-3.2-1B-Instruct",
+                    fast_inference=True,
+                    gpu_memory_utilization=0.8,
+                )
+
+        Note:
+            - Only one of load_in_4bit, load_in_8bit, or load_in_16bit should be True
+            - Import unsloth before transformers to ensure patches are applied
+            - For AMD GPUs, 4-bit quantization may be automatically disabled
+
+        See Also:
+            - :meth:`get_peft_model`: Apply LoRA adapters to the loaded model
+            - :func:`unsloth.save.unsloth_save_model`: Save the trained model
+        """
         # Login to allow private models
         if token is None:
             token = get_token()
@@ -595,8 +773,39 @@ except:
 
 
 class FastModel(FastBaseModel):
+    """
+    General-purpose model loader with support for vision-language and text models.
+
+    FastModel extends the loading capabilities to support a wider range of model
+    architectures including vision-language models (VLMs), Whisper for speech,
+    and other multimodal models. It uses torch.compile for additional optimizations.
+
+    This class is the backend for both :class:`FastVisionModel` and
+    :class:`FastTextModel`, providing a unified interface for loading various
+    model types with Unsloth optimizations.
+
+    Note:
+        For text-only models, consider using :class:`FastLanguageModel` which
+        has specialized optimizations for language models.
+
+    See Also:
+        - :class:`FastLanguageModel`: Optimized for text-only models
+        - :class:`FastVisionModel`: Alias for loading vision-language models
+        - :class:`FastTextModel`: Alias for loading text models
+    """
+
     @staticmethod
     def _prepare_for_qat(model, qat_scheme):
+        """
+        Prepare model for Quantization-Aware Training (QAT).
+
+        Args:
+            model: The model to prepare for QAT.
+            qat_scheme: The QAT scheme to apply.
+
+        Returns:
+            The model prepared for QAT training.
+        """
         model = _prepare_model_for_qat(model, qat_scheme)
         return model
 
@@ -637,6 +846,96 @@ class FastModel(FastBaseModel):
         *args,
         **kwargs,
     ):
+        """
+        Load a pre-trained model with Unsloth optimizations using torch.compile.
+
+        This method provides general model loading with torch.compile optimizations,
+        supporting both vision-language models and text models. It's more flexible
+        than FastLanguageModel.from_pretrained() but may have different performance
+        characteristics.
+
+        Args:
+            model_name: HuggingFace model ID or local path. Default is a vision model.
+            max_seq_length: Maximum sequence length for training/inference.
+            dtype: Data type for model weights (torch.float16, torch.bfloat16, etc.).
+            load_in_4bit: Load in 4-bit quantization. Default: True.
+            load_in_8bit: Load in 8-bit quantization.
+            load_in_16bit: Load in 16-bit precision.
+            full_finetuning: Enable full finetuning instead of LoRA.
+            token: HuggingFace API token for private models.
+            device_map: Device placement strategy. Default: "sequential".
+            rope_scaling: RoPE scaling configuration (currently no effect).
+            fix_tokenizer: Fix common tokenizer issues (currently no effect).
+            trust_remote_code: Allow custom code from HuggingFace Hub.
+            use_gradient_checkpointing: Gradient checkpointing strategy.
+                Options: "unsloth", True, False.
+            resize_model_vocab: Resize vocabulary (currently no effect).
+            revision: Specific model revision to load.
+            return_logits: Return logits from forward pass.
+            fullgraph: Use full graph compilation without breaks.
+            use_exact_model_name: Skip automatic model name resolution.
+            auto_model: Custom AutoModel class to use for loading.
+                If None, auto-detects based on model type.
+            whisper_language: Language for Whisper models.
+            whisper_task: Task for Whisper models ("transcribe" or "translate").
+            unsloth_force_compile: Force torch.compile even for unsupported models.
+            offload_embedding: Offload embeddings to CPU.
+            float32_mixed_precision: Force float32 for certain operations.
+            fast_inference: Enable vLLM for faster inference.
+            gpu_memory_utilization: GPU memory fraction for vLLM (0.0-1.0).
+            float8_kv_cache: Use float8 KV cache.
+            random_state: Random seed for reproducibility.
+            max_lora_rank: Maximum LoRA rank for inference.
+            disable_log_stats: Disable inference logging.
+            qat_scheme: Quantization-Aware Training scheme. Only valid with
+                full_finetuning=True.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments for the model loader.
+
+        Returns:
+            tuple: A tuple of (model, tokenizer) ready for training or inference.
+
+        Raises:
+            RuntimeError: If invalid configuration (e.g., multiple quantization
+                options or QAT without full_finetuning).
+            ImportError: If transformers version doesn't support the model.
+
+        Example:
+            Loading a vision-language model::
+
+                from unsloth import FastVisionModel
+
+                model, tokenizer = FastVisionModel.from_pretrained(
+                    "unsloth/Llama-3.2-11B-Vision-Instruct-bnb-4bit",
+                    max_seq_length=2048,
+                )
+
+            Loading with custom AutoModel::
+
+                from transformers import AutoModelForCausalLM
+                from unsloth import FastModel
+
+                model, tokenizer = FastModel.from_pretrained(
+                    "my-model",
+                    auto_model=AutoModelForCausalLM,
+                )
+
+            Loading a Whisper model::
+
+                model, processor = FastModel.from_pretrained(
+                    "openai/whisper-large-v3",
+                    whisper_language="en",
+                    whisper_task="transcribe",
+                )
+
+        Note:
+            - QAT (qat_scheme) requires full_finetuning=True
+            - For text-only models, FastLanguageModel may offer better performance
+
+        See Also:
+            - :class:`FastLanguageModel`: Optimized for text-only models
+            - :meth:`get_peft_model`: Apply LoRA to the loaded model
+        """
         if token is None:
             token = get_token()
         # Login to allow private models
@@ -1161,8 +1460,52 @@ class FastModel(FastBaseModel):
 
 
 class FastVisionModel(FastModel):
+    """
+    Specialized loader for vision-language models with Unsloth optimizations.
+
+    FastVisionModel is an alias for :class:`FastModel`, providing a semantic
+    interface for loading vision-language models like LLaVA, Llama 3.2 Vision,
+    and other multimodal architectures.
+
+    Example:
+        Loading a vision-language model::
+
+            from unsloth import FastVisionModel
+
+            model, tokenizer = FastVisionModel.from_pretrained(
+                "unsloth/Llama-3.2-11B-Vision-Instruct-bnb-4bit",
+                max_seq_length=2048,
+                load_in_4bit=True,
+            )
+
+    See Also:
+        - :class:`FastModel`: Base class with full documentation
+        - :class:`FastLanguageModel`: For text-only models
+    """
     pass
 
 
 class FastTextModel(FastModel):
+    """
+    Specialized loader for text models using torch.compile optimizations.
+
+    FastTextModel is an alias for :class:`FastModel`, providing a semantic
+    interface for loading text models with torch.compile-based optimizations.
+    For most text-only use cases, :class:`FastLanguageModel` is recommended
+    as it has more specialized optimizations.
+
+    Example:
+        Loading a text model::
+
+            from unsloth import FastTextModel
+
+            model, tokenizer = FastTextModel.from_pretrained(
+                "unsloth/Llama-3.2-1B-Instruct",
+                max_seq_length=2048,
+            )
+
+    See Also:
+        - :class:`FastLanguageModel`: Recommended for text-only models
+        - :class:`FastModel`: Base class with full documentation
+    """
     pass
