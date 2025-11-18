@@ -43,10 +43,10 @@ if already_imported:
     )
 del already_imported, critical_modules
 
-# Unsloth currently does not work on multi GPU setups - sadly we are a 2 brother team so
-# enabling it will require much more work, so we have to prioritize. Please understand!
-# We do have a beta version, which you can contact us about!
-# Thank you for your understanding and we appreciate it immensely!
+# Unsloth now supports multi-GPU setups through the distributed module.
+# See unsloth.distributed for optimized DDP with gradient compression,
+# overlapped communication, and LoRA-aware synchronization.
+# For standard usage, use UnslothDDP.from_model() or UnslothDDP.auto().
 
 # Fixes https://github.com/unslothai/unsloth/issues/1266
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
@@ -247,6 +247,16 @@ from .save import *
 from .chat_templates import *
 from .tokenizer_utils import *
 from .trainer import *
+from .distributed import (
+    CompressedAllReduce,
+    OverlappedDDP,
+    LoRAAwareDDP,
+    ring_allreduce,
+    UnslothDDP,
+    initialize_distributed,
+    cleanup_distributed,
+    get_distributed_info,
+)
 from unsloth_zoo.rl_environments import (
     check_python_modules,
     create_locked_down_function,
