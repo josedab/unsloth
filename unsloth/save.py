@@ -23,6 +23,32 @@ from unsloth_zoo.llama_cpp import (
     check_llama_cpp,
     _download_convert_hf_to_gguf,
 )
+
+# Import from new modular save package for backward compatibility
+# Users are encouraged to use the new modular API directly:
+#   from unsloth.save import save_merged_model, MergedConfig
+from .save import (
+    # Configs
+    SaveConfig,
+    GGUFConfig,
+    MergedConfig,
+    LoRAConfig,
+    # Exceptions
+    SaveError,
+    ValidationError,
+    ConversionError,
+    HubError,
+    # Functions (these will be the recommended API)
+    save_merged_model as _save_merged_model_new,
+    save_to_gguf as _save_to_gguf_new,
+    save_lora_model as _save_lora_model_new,
+    push_to_hub as _push_to_hub_new,
+    create_ollama_modelfile,
+    create_ollama_model,
+    push_to_ollama_hub,
+    fix_tokenizer_bos_token,
+    merge_lora_weights as _merge_lora_weights_new,
+)
 from bitsandbytes.nn import Linear4bit as Bnb_Linear4bit
 from peft.tuners.lora import Linear4bit as Peft_Linear4bit
 from peft.tuners.lora import Linear as Peft_Linear
@@ -58,11 +84,26 @@ from pathlib import Path
 from peft import PeftModelForCausalLM, PeftModel
 
 __all__ = [
+    # Legacy API (maintained for backward compatibility)
     "print_quantization_methods",
     "unsloth_save_model",
     "save_to_gguf",
     "patch_saving_functions",
     "create_huggingface_repo",
+    # New modular API (recommended)
+    "SaveConfig",
+    "GGUFConfig",
+    "MergedConfig",
+    "LoRAConfig",
+    "SaveError",
+    "ValidationError",
+    "ConversionError",
+    "HubError",
+    # Re-exported Ollama functions
+    "create_ollama_modelfile",
+    "create_ollama_model",
+    "push_to_ollama_hub",
+    "fix_tokenizer_bos_token",
 ]
 
 # llama.cpp specific targets - all takes 90s. Below takes 60s
