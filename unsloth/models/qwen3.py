@@ -29,7 +29,7 @@ try:
         Qwen3Model,
         Qwen3ForCausalLM,
     )
-except:
+except ImportError:
     transformers_version = Version(transformers_version)
     if not transformers_version >= Version(
         "4.50.3"
@@ -50,7 +50,7 @@ try:
         Qwen3SdpaAttention,
         Qwen3FlashAttention2,
     )
-except:
+except ImportError:
     Qwen3SdpaAttention = Qwen3Attention
     Qwen3FlashAttention2 = Qwen3Attention
 

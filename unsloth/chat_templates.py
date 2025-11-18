@@ -2711,7 +2711,7 @@ extra_eos_tokens = None,
                 "But we require the following:\n"\
                 f"{left_changed}"
             )
-    except:
+    except Exception:
         ending = chat_template[chat_template.find("{OUTPUT}") + len("{OUTPUT}"):]
 
         ending = re.escape(ending)
@@ -2722,7 +2722,7 @@ extra_eos_tokens = None,
         for j in range(1, len(response_part)):
             try_find = re.escape(response_part[:j])
             try: found = next(re.finditer("(" + try_find + ").+?\\{INPUT\\}", chat_template, flags = re.DOTALL | re.MULTILINE))
-            except: break
+            except StopIteration: break
         separator = found.group(1)
 
         response_start = chat_template.find(response_part)
@@ -3033,7 +3033,7 @@ def test_chat_templates():
     # Vicuna
     try:
         from fastchat.conversation import get_conv_template
-    except:
+    except ImportError:
         os.system("pip -qqq install git+https://github.com/lm-sys/FastChat.git")
         from fastchat.conversation import get_conv_template
     correct_prompt = get_conv_template("vicuna_v1.1")
@@ -3050,7 +3050,7 @@ def test_chat_templates():
 
     try:
         from fastchat.conversation import get_conv_template
-    except:
+    except ImportError:
         os.system("pip -qqq install git+https://github.com/lm-sys/FastChat.git")
         from fastchat.conversation import get_conv_template
     correct_prompt = get_conv_template("zero_shot")

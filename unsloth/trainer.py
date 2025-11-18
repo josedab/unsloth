@@ -65,7 +65,7 @@ else:
 
 try:
     from trl import SFTConfig as TrainingArguments
-except:
+except ImportError:
     from transformers import TrainingArguments
 
 
@@ -234,7 +234,7 @@ def _patch_trl_trainer():
                 f"trl.{x}Trainer.__init__ = _backwards_compatible_trainer(trl.{x}Trainer, trl.{x}Config)",
                 globals(),
             )
-        except:
+        except Exception:
             continue
 
     trl.__UNSLOTH_BACKWARDS_COMPATIBLE__ = True

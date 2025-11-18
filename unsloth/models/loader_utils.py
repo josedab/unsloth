@@ -99,7 +99,7 @@ def _get_new_mapper():
             NEW_FLOAT_TO_INT_MAPPER,
             NEW_MAP_TO_UNSLOTH_16bit,
         )
-    except:
+    except Exception:
         return {}, {}, {}
 
 

@@ -53,7 +53,7 @@ def terminate_tree(proc: subprocess.Popen, timeout = 15):
         parent.terminate()
         parent.wait(timeout = timeout / 2)
         return
-    except:
+    except Exception:
         pass
 
     if os.name == "nt":
@@ -65,13 +65,13 @@ def terminate_tree(proc: subprocess.Popen, timeout = 15):
             )
             proc.wait(timeout = 1)
             return
-        except:
+        except Exception:
             pass
 
     proc.kill()
     try:
         proc.wait(timeout = 5)
-    except:
+    except Exception:
         pass
 
 

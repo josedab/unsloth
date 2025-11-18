@@ -190,14 +190,14 @@ if os.environ.get("UNSLOTH_ENABLE_LOGGING", "0") != "1":
 
         vllm_worker_logger.addFilter(HideLoggingMessage("Sleep mode freed"))
         del vllm_worker_logger
-    except:
+    except ImportError:
         pass
     try:
         from vllm.v1.worker.gpu_worker import logger as vllm_gpu_worker_logger
 
         vllm_gpu_worker_logger.addFilter(HideLoggingMessage("Sleep mode freed"))
         del vllm_gpu_worker_logger
-    except:
+    except ImportError:
         pass
     try:
         from vllm.executor.executor_base import logger as vllm_executor_logger
@@ -206,7 +206,7 @@ if os.environ.get("UNSLOTH_ENABLE_LOGGING", "0") != "1":
         vllm_executor_logger.addFilter(HideLoggingMessage("to wake up"))
         vllm_executor_logger.addFilter(HideLoggingMessage("Executor is not sleeping"))
         del vllm_executor_logger
-    except:
+    except ImportError:
         pass
     try:
         from vllm.core.block.prefix_caching_block import (
@@ -215,14 +215,14 @@ if os.environ.get("UNSLOTH_ENABLE_LOGGING", "0") != "1":
 
         vllm_prefix_caching_logger.addFilter(HideLoggingMessage("reset prefix cache"))
         del vllm_prefix_caching_logger
-    except:
+    except ImportError:
         pass
     try:
         from vllm.v1.core.block_pool import logger as vllm_block_pool_logger
 
         vllm_block_pool_logger.addFilter(HideLoggingMessage("reset prefix cache"))
         del vllm_block_pool_logger
-    except:
+    except ImportError:
         pass
     try:
         from vllm.lora.models import logger as vllm_lora_model_logger
@@ -233,7 +233,7 @@ if os.environ.get("UNSLOTH_ENABLE_LOGGING", "0") != "1":
             )
         )
         del vllm_lora_model_logger
-    except:
+    except ImportError:
         pass
     try:
         from vllm.attention.utils.fa_utils import (
@@ -244,7 +244,7 @@ if os.environ.get("UNSLOTH_ENABLE_LOGGING", "0") != "1":
             HideLoggingMessage("Cannot use FA version")
         )
         del vllm_attention_utils_fa_utils_logger
-    except:
+    except ImportError:
         pass
 
 # The speedups for torchdynamo mostly come with GPU Ampere or higher and which is not detected here.
@@ -274,7 +274,7 @@ try:
 
     transformers_modeling_utils_logger.addFilter(HideLoggingMessage("ForCausalLMLoss"))
     del transformers_modeling_utils_logger
-except:
+except ImportError:
     pass
 
 # The model weights are not tied. Please use the `tie_weights` method before using the `infer_auto_device` function.
@@ -285,7 +285,7 @@ try:
         HideLoggingMessage("The model weights are not tied")
     )
     del accelerate_utils_modeling_logger
-except:
+except ImportError:
     pass
 
 # Setting `pad_token_id` to `eos_token_id`
@@ -300,7 +300,7 @@ try:
     # "You have set `compile_config`
     transformers_generation_utils_logger.addFilter(HideLoggingMessage("compile_config"))
     del transformers_generation_utils_logger
-except:
+except ImportError:
     pass
 
 # The following generation flags are not valid and may be ignored:
@@ -311,7 +311,7 @@ try:
 
     configuration_logger.addFilter(HideLoggingMessage("following generation flags"))
     del configuration_logger
-except:
+except ImportError:
     pass
 
 # Gemma3 It is strongly recommended to train Gemma3 models with the `eager`
@@ -320,7 +320,7 @@ try:
 
     gemma3_logger.addFilter(HideLoggingMessage("strongly recommended"))
     del gemma3_logger
-except:
+except ImportError:
     pass
 
 # Xet Storage is enabled for this repo, but the 'hf_xet' package is not installed.
@@ -329,7 +329,7 @@ try:
 
     hub_logger.addFilter(HideLoggingMessage("hf_xet"))
     del hub_logger
-except:
+except ImportError:
     pass
 
 # MXFP4 quantization requires triton >= 3.4.0
@@ -338,7 +338,7 @@ try:
 
     mxfp4_logger.addFilter(HideLoggingMessage("requires triton"))
     del mxfp4_logger
-except:
+except ImportError:
     pass
 
 # You passed `quantization_config` or equivalent parameters
@@ -349,7 +349,7 @@ try:
         category = UserWarning,
         append = True,
     )
-except:
+except Exception:
     pass
 
 # UserWarning: Logical operators 'and' and 'or' are deprecated for non-scalar tensors; please use '&' or '|' instead
@@ -361,7 +361,7 @@ try:
         category = UserWarning,
         append = True,
     )
-except:
+except Exception:
     pass
 
 # Using a slow image processor as `use_fast`
@@ -370,7 +370,7 @@ try:
 
     processing_utils_logger.addFilter(HideLoggingMessage("`use_fast`"))
     del processing_utils_logger
-except:
+except ImportError:
     pass
 
 # Using a slow image processor as `use_fast`
@@ -381,7 +381,7 @@ try:
 
     processing_utils_logger.addFilter(HideLoggingMessage("`use_fast`"))
     del processing_utils_logger
-except:
+except ImportError:
     pass
 
 # `use_cache=True` is incompatible with gradient checkpointing
@@ -390,7 +390,7 @@ try:
 
     trainer_logger.addFilter(HideLoggingMessage("`use_cache=True`"))
     del trainer_logger
-except:
+except ImportError:
     pass
 
 # `use_cache=True` is incompatible with gradient checkpointing
@@ -399,7 +399,7 @@ try:
 
     trainer_logger.addFilter(HideLoggingMessage("`use_cache=True`"))
     del trainer_logger
-except:
+except ImportError:
     pass
 
 # We detected that you are using `from_pretrained` with a meta device context manager or `torch.set_default_device('meta')
@@ -408,7 +408,7 @@ try:
 
     modeling_utils_logger.addFilter(HideLoggingMessage("anti-pattern"))
     del modeling_utils_logger
-except:
+except ImportError:
     pass
 
 # Errors out on
@@ -527,13 +527,13 @@ try:
     # Some Config files use layer_type_validation
     # for eg Gemma-2, so we must import it to stop errors.
     from transformers.configuration_utils import layer_type_validation
-except:
+except ImportError:
     pass
 from transformers import __version__ as transformers_version
 
 try:
     from transformers import PreTrainedConfig
-except:
+except ImportError:
     from transformers import PretrainedConfig
 
 model_architectures = [
@@ -554,12 +554,12 @@ for model_name in model_architectures:
     config_filename = f"{model_name.title().replace('_','')}Config"  # qwen3 arch folder is qwen3_moe but config is Qwen3Config. Need to remove underscore(_) for now
     try:
         exec(f"from {config_filepath} import {config_filename}", globals())
-    except:
+    except ImportError:
         continue
 
     try:
         config = inspect.getsource(eval(config_filename))
-    except:
+    except (OSError, TypeError):
         continue
     if "rope_scaling" in config:
         continue
@@ -628,7 +628,7 @@ from transformers.utils import is_openai_available
 if is_openai_available():
     try:
         from openai import OpenAI
-    except:
+    except ImportError:
         print("Unsloth: OpenAI failed to import - ignoring for now.")
         import transformers.utils
 
@@ -660,7 +660,7 @@ if DEVICE_TYPE == "cuda":
                 try:
                     # See https://github.com/unslothai/unsloth/issues/1437
                     from flash_attn.flash_attn_interface import flash_attn_gpu
-                except:
+                except ImportError:
                     from flash_attn.flash_attn_interface import flash_attn_cuda
                 HAS_FLASH_ATTENTION = True
 
@@ -677,7 +677,7 @@ if DEVICE_TYPE == "cuda":
                         "To update flash-attn, do the below:\n"
                         '\npip install --no-deps --no-build-isolation --upgrade "flash-attn>=2.6.3"'
                     )
-            except:
+            except Exception:
                 print(
                     "Unsloth: Your Flash Attention 2 installation seems to be broken?\n"
                     "A possible explanation is you have a new CUDA version which isn't\n"
@@ -712,7 +712,7 @@ elif DEVICE_TYPE == "hip":
             try:
                 # See https://github.com/unslothai/unsloth/issues/1437
                 from flash_attn.flash_attn_interface import flash_attn_gpu
-            except:
+            except ImportError:
                 from flash_attn.flash_attn_interface import flash_attn_cuda
             HAS_FLASH_ATTENTION = True
 
@@ -729,7 +729,7 @@ elif DEVICE_TYPE == "hip":
                     "To update flash-attn, do the below:\n"
                     '\npip install --no-deps --no-build-isolation --upgrade "flash-attn>=2.6.3"'
                 )
-        except:
+        except Exception:
             print(
                 "Unsloth: Your Flash Attention 2 installation seems to be broken?\n"
                 "A possible explanation is you have a new CUDA version which isn't\n"
@@ -1042,7 +1042,7 @@ if Version(peft_version) < Version("0.12.0"):
         from peft.tuners.lora import LoraLayer
 
         LoraLayer.update_layer = LoraLayer_update_layer
-    except:
+    except Exception:
         logger.warning_once(
             "Unsloth unsuccessfully patched LoraLayer.update_layer. Please file a bug report.\n"
             "Luckily, your training run will still work in the meantime!"
@@ -1133,7 +1133,7 @@ def _get_statistics(statistics = None, force_download = True):
         pass
         try:
             statistics = try_vllm_check()
-        except:
+        except Exception:
             statistics = "other"
     if statistics is not None:
         import tempfile
@@ -1166,7 +1166,7 @@ def _get_statistics(statistics = None, force_download = True):
                     "model = FastLanguageModel.from_pretrained('unsloth/gpt-oss-20b')\n"
                     "```"
                 )
-            except:
+            except Exception:
                 # Try no time limit check
                 stats_check()
 
@@ -1389,7 +1389,7 @@ def patch_linear_scaling(
 
     try:
         function = inspect.getsource(attention_module.__init__)
-    except:
+    except (OSError, TypeError):
         # Most likely already patched!
         return None, None
     where = function.find("def")
@@ -1468,7 +1468,7 @@ def patch_llama_rope_scaling(
 
     try:
         function = inspect.getsource(attention_module.__init__)
-    except:
+    except (OSError, TypeError):
         # Most likely already patched!
         return None, None
     where = function.find("def")
@@ -1935,7 +1935,7 @@ for j, function in enumerate(functions):
         )
         try:
             exec(f"EMPTY_LOGITS.{function} = raise_{j}", globals(), locals())
-        except:
+        except (TypeError, AttributeError):
             continue
 
 
@@ -2046,10 +2046,10 @@ try:
 
     try:
         from torchao.quantization import Int4WeightOnlyConfig
-    except:
+    except ImportError:
         print("Unsloth: TorchAO changed `torchao.quantization.Int4WeightOnlyConfig`")
         Int4WeightOnlyConfig = None
-except:
+except ImportError:
     AOBaseConfig = None
     Int4WeightOnlyConfig = None
 

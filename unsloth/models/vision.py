@@ -24,7 +24,7 @@ try:
     from transformers import AutoModelForImageTextToText
 
     AutoModelForVision2Seq = AutoModelForImageTextToText
-except:
+except ImportError:
     from transformers import AutoModelForVision2Seq
 from ..kernels import (
     post_patch_loss_function,
@@ -69,7 +69,7 @@ import types
 
 try:
     from huggingface_hub.utils import get_token
-except:
+except ImportError:
     # Old HF Hub versions <= 0.0.25
     from huggingface_hub.utils._token import get_token
 from ..device_type import (
@@ -107,7 +107,7 @@ try:
     from transformers import PreTrainedConfig
 
     PretrainedConfig = PreTrainedConfig
-except:
+except ImportError:
     from transformers import PretrainedConfig
 
 HAS_TORCH_DTYPE = "torch_dtype" in PretrainedConfig.__doc__
@@ -128,7 +128,7 @@ from unsloth_zoo.vllm_utils import (
 
 try:
     torch_compiler_set_stance = torch.compiler.set_stance
-except:
+except AttributeError:
     torch_compiler_set_stance = None
 
 
@@ -214,7 +214,7 @@ def unsloth_base_fast_generate(
     # Get pixel values for VLMs
     try:
         kwargs["pixel_values"] = kwargs["pixel_values"].to(dtype)
-    except:
+    except (KeyError, AttributeError):
         pass
 
     # Mixed precision autocast
@@ -282,13 +282,13 @@ def unsloth_base_fast_generate(
         if hasattr(module, "_flex_attention_cache"):
             try:
                 del module._flex_attention_cache
-            except:
+            except AttributeError:
                 pass
         # Solves AttributeError: 'SlidingWindowLayer' object has no attribute 'max_batch_size'
         if hasattr(module, "_cache") and "cache_utils" in str(module._cache.__class__):
             try:
                 del module._cache
-            except:
+            except AttributeError:
                 pass
 
     # DO INFERENCE
@@ -300,13 +300,13 @@ def unsloth_base_fast_generate(
         if hasattr(module, "_flex_attention_cache"):
             try:
                 del module._flex_attention_cache
-            except:
+            except AttributeError:
                 pass
         # Solves AttributeError: 'SlidingWindowLayer' object has no attribute 'max_batch_size'
         if hasattr(module, "_cache") and "cache_utils" in str(module._cache.__class__):
             try:
                 del module._cache
-            except:
+            except AttributeError:
                 pass
 
     # FastBaseModel.for_training(self)
@@ -403,7 +403,7 @@ class FastBaseModel:
             gpu_stats_snippet = f"CUDA: {gpu_stats.major}.{gpu_stats.minor}. CUDA Toolkit: {gpu_version}."
             try:
                 vllm_version = f" vLLM: {importlib_version('vllm')}."
-            except:
+            except Exception:
                 vllm_version = ""
         elif DEVICE_TYPE == "hip":
             gpu_stats = torch.cuda.get_device_properties(0)
@@ -414,7 +414,7 @@ class FastBaseModel:
             gpu_stats_snippet = f"ROCm Toolkit: {gpu_version}."
             try:
                 vllm_version = f" vLLM: {importlib_version('vllm')}."
-            except:
+            except Exception:
                 vllm_version = ""
         elif DEVICE_TYPE == "xpu":
             gpu_stats = torch.xpu.get_device_properties(0)
@@ -788,7 +788,7 @@ class FastBaseModel:
                     padding_side = "left",
                     token = token,
                 )
-            except:
+            except Exception:
                 tokenizer = get_auto_processor(
                     tokenizer_name,
                     padding_side = "left",
@@ -1207,7 +1207,7 @@ class FastBaseModel:
                 try:
                     # Weirdly sometimes cannot succeed so do a try except
                     del m._flag_for_generation
-                except:
+                except AttributeError:
                     pass
 
         m = model

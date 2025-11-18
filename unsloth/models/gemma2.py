@@ -32,7 +32,7 @@ try:
         apply_rotary_pos_emb,
         repeat_kv,
     )
-except:
+except ImportError:
     from packaging.version import Version
 
     transformers_version = Version(transformers_version)
@@ -54,7 +54,7 @@ try:
         Gemma2SdpaAttention,
         Gemma2FlashAttention2,
     )
-except:
+except ImportError:
     Gemma2SdpaAttention = Gemma2Attention
     Gemma2FlashAttention2 = Gemma2Attention
 

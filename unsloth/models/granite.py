@@ -32,7 +32,7 @@ try:
         GraniteModel,
         GraniteForCausalLM,
     )
-except:
+except ImportError:
     from packaging.version import Version
 
     transformers_version = Version(transformers_version)
@@ -54,7 +54,7 @@ try:
         GraniteSdpaAttention,
         GraniteFlashAttention2,
     )
-except:
+except ImportError:
     GraniteSdpaAttention = GraniteAttention
     GraniteFlashAttention2 = GraniteAttention
 

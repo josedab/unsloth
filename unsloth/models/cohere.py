@@ -27,7 +27,7 @@ try:
         apply_rotary_pos_emb,
         repeat_kv,
     )
-except:
+except ImportError:
     from packaging.version import Version
 
     transformers_version = Version(transformers_version)
@@ -49,7 +49,7 @@ try:
         CohereSdpaAttention,
         CohereFlashAttention2,
     )
-except:
+except ImportError:
     CohereSdpaAttention = CohereAttention
     CohereFlashAttention2 = CohereAttention
 

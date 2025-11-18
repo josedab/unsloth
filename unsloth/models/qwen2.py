@@ -30,7 +30,7 @@ try:
         Qwen2SdpaAttention,
         Qwen2FlashAttention2,
     )
-except:
+except ImportError:
     Qwen2SdpaAttention = Qwen2Attention
     Qwen2FlashAttention2 = Qwen2Attention
 

@@ -199,12 +199,12 @@ def PatchRL(FastLanguageModel):
     for trainer in trainers:
         try:
             current_trainer = eval(f"trl.trainer.{trainer}")
-        except:
+        except Exception:
             continue
         if hasattr(current_trainer, unwrap):
             try:
                 exec(f"trl.trainer.{trainer}.{unwrap} = unsloth_{unwrap}")
-            except:
+            except Exception:
                 continue
     exec(f"Trainer.prediction_step=unsloth_prediction_step")
 
@@ -349,11 +349,11 @@ def _patch_trl_rl_trainers(trainer_file = "grpo_trainer"):
     RLConfig_name = config[0]
     try:
         RLTrainer = eval(f"trl.trainer.{trainer_file}.{RLTrainer_name}")
-    except:
+    except Exception:
         return
     try:
         RLConfig = eval(f"trl.trainer.{trainer_file}.{RLConfig_name}")
-    except:
+    except Exception:
         return
 
     # Check name
@@ -1154,7 +1154,7 @@ def patch_functions(RLTrainer, trainer_file, RLTrainer_name, all_imports, import
         fx = getattr(RLTrainer, function)
         try:
             source = inspect.getsource(fx)
-        except:
+        except (OSError, TypeError):
             continue
         original_source = source
 

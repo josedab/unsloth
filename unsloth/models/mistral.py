@@ -34,7 +34,7 @@ try:
         MistralSdpaAttention,
         MistralFlashAttention2,
     )
-except:
+except ImportError:
     MistralSdpaAttention = MistralAttention
     MistralFlashAttention2 = MistralAttention
 from unsloth_zoo.utils import Version, _get_dtype

@@ -79,7 +79,7 @@ def fix_message_factory_issue():
             if UNSLOTH_ENABLE_LOGGING:
                 print("Unsloth: Patching protobuf.MessageFactory.GetPrototype")
         pass
-    except:
+    except ImportError:
         pass
 
 
@@ -162,7 +162,7 @@ def ignore_logger_messages():
 
         huggingface_hub_logger.addFilter(HideLoggingMessage("`HF_TOKEN`"))
         del huggingface_hub_logger
-    except:
+    except ImportError:
         pass
 
 

@@ -48,10 +48,10 @@ from huggingface_hub import HfApi
 
 try:
     from huggingface_hub import get_token
-except:
+except ImportError:
     try:
         from huggingface_hub.utils import get_token
-    except:
+    except ImportError:
         # For older versions of huggingface_hub
         from huggingface_hub.utils._token import get_token
 from pathlib import Path
@@ -290,7 +290,7 @@ def unsloth_save_model(
 
         try:
             username = whoami(token = token)["name"]
-        except:
+        except Exception:
             raise RuntimeError(
                 "Unsloth: Please supply a token!\n"
                 "Go to https://huggingface.co/settings/tokens"
@@ -664,7 +664,7 @@ def unsloth_save_model(
                 state_dict[f"model.layers.{j}.{item}.weight"] = eval(
                     f"layer.{item}.weight.data"
                 )
-            except:
+            except AttributeError:
                 continue
 
     state_dict["model.norm.weight"] = internal_model.model.norm.weight.data
@@ -1190,7 +1190,7 @@ def save_to_gguf(
     try:
         quantizer_location, converter_location = check_llama_cpp()
         print("Unsloth: llama.cpp found in the system. Skipping installation.")
-    except:
+    except Exception:
         print("Unsloth: Installing llama.cpp. This might take 3 minutes...")
         if IS_KAGGLE_ENVIRONMENT:
             # Kaggle: no CUDA support due to environment limitations
@@ -1445,7 +1445,7 @@ def _determine_username(save_directory, old_username, token):
             if type(old_username) is str and username != old_username:
                 username = old_username
             save_directory = f"{username}/{save_directory}"
-        except:
+        except Exception:
             raise RuntimeError(
                 f"Unsloth: {save_directory} is not a Huggingface directory."
             )
@@ -1487,7 +1487,7 @@ def create_huggingface_repo(
         )
         card = ModelCard(content)
         card.push_to_hub(save_directory, token = token)
-    except:
+    except Exception:
         pass
     hf_api = HfApi(token = token)
     return save_directory, hf_api
@@ -1529,7 +1529,7 @@ def upload_to_huggingface(
         )
         card = ModelCard(content)
         card.push_to_hub(save_directory, token = token)
-    except:
+    except Exception:
         pass
 
     if file_location is not None:
@@ -1829,7 +1829,7 @@ def unsloth_save_pretrained_gguf(
     try:
         base_model_name = get_model_name(self.config._name_or_path, load_in_4bit = False)
         model_name = base_model_name.split("/")[-1]
-    except:
+    except Exception:
         base_model_name = self.config._name_or_path
         model_name = base_model_name.split("/")[-1]
 
@@ -2140,7 +2140,7 @@ def unsloth_push_to_hub_gguf(
 
             try:
                 shutil.rmtree(save_directory)
-            except:
+            except Exception:
                 pass
         raise RuntimeError(f"Failed to convert model to GGUF: {e}")
 
@@ -2311,7 +2311,7 @@ This model was finetuned and converted to GGUF format using [Unsloth](https://gi
                 tags = tags,
                 repo_type = "model",
             )
-        except:
+        except Exception:
             pass
 
     except Exception as e:
@@ -2325,7 +2325,7 @@ This model was finetuned and converted to GGUF format using [Unsloth](https://gi
 
             try:
                 shutil.rmtree(save_directory)
-            except:
+            except Exception:
                 pass
 
     return full_repo_id
@@ -2883,7 +2883,7 @@ def patch_saving_functions(model, vision = False):
 
     try:
         self.original_push_to_hub(**arguments)
-    except:
+    except Exception:
         del arguments["tags"]
         self.original_push_to_hub(**arguments)
     pass

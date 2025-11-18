@@ -82,7 +82,7 @@ except PackageNotFoundError:
     raise ImportError(
         f"Unsloth: Please install unsloth_zoo via `pip install unsloth_zoo` then retry!"
     )
-except:
+except Exception:
     raise
 del PackageNotFoundError, importlib_version
 
@@ -94,7 +94,7 @@ except ModuleNotFoundError:
         "Unsloth: Pytorch is not installed. Go to https://pytorch.org/.\n"
         "We have some installation instructions on our Github page."
     )
-except:
+except Exception:
     raise
 
 from unsloth_zoo.device_type import (
@@ -165,7 +165,7 @@ if DEVICE_TYPE == "cuda":
     if Version(triton.__version__) >= Version("3.0.0"):
         try:
             from triton.backends.nvidia.driver import libcuda_dirs
-        except:
+        except ImportError:
             pass
     else:
         from triton.common.build import libcuda_dirs
@@ -173,14 +173,14 @@ if DEVICE_TYPE == "cuda":
     # Try loading bitsandbytes and triton
     try:
         import bitsandbytes as bnb
-    except:
+    except ImportError:
         print(
             "Unsloth: `bitsandbytes` is not installed - 4bit QLoRA unallowed, but 16bit and full finetuning works!"
         )
     try:
         cdequantize_blockwise_fp32 = bnb.functional.lib.cdequantize_blockwise_fp32
         libcuda_dirs()
-    except:
+    except Exception:
         warnings.warn("Unsloth: Running `ldconfig /usr/lib64-nvidia` to link CUDA.")
 
         if os.path.exists("/usr/lib64-nvidia"):
@@ -216,13 +216,13 @@ if DEVICE_TYPE == "cuda":
             if Version(triton.__version__) >= Version("3.0.0"):
                 try:
                     from triton.backends.nvidia.driver import libcuda_dirs
-                except:
+                except ImportError:
                     pass
             else:
                 from triton.common.build import libcuda_dirs
             cdequantize_blockwise_fp32 = bnb.functional.lib.cdequantize_blockwise_fp32
             libcuda_dirs()
-        except:
+        except Exception:
             warnings.warn(
                 "Unsloth: CUDA is not linked properly.\n"
                 "Try running `python -m bitsandbytes` then `python -m xformers.info`\n"

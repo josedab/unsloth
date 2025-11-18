@@ -94,5 +94,5 @@ if DEVICE_TYPE == "hip":
         import bitsandbytes
 
         ALLOW_BITSANDBYTES = Version(bitsandbytes.__version__) > Version("0.48.2.dev0")
-    except:
+    except Exception:
         pass

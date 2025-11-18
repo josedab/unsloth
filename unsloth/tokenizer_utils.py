@@ -146,7 +146,7 @@ def convert_to_fast_tokenizer(
             )
         else:
             FastTokenizer = PreTrainedTokenizerFast
-    except:
+    except (ImportError, NameError):
         FastTokenizer = PreTrainedTokenizerFast
 
     # Get all arguments (bos_token, etc)
@@ -333,7 +333,7 @@ def assert_same_tokenization(slow_tokenizer, fast_tokenizer):
         )
 
         return check_chat_template and check_special_tokens
-    except:
+    except Exception:
         # For eg see https://github.com/unslothai/unsloth/issues/292
         # Sometimes tokenizer has weird tokens, causing a combined tokenization to fail.
         # [TODO] We temporarily disable this for CodeLlama tokenizers
@@ -366,7 +366,7 @@ def fix_sentencepiece_tokenizer(
                     f"Unsloth: Your protobuf version = {protobuf_version} is too new.\n"
                     f"Please downgrade via `pip install --force-reinstall protobuf==3.20.3`"
                 )
-        except:
+        except ImportError:
             # This will only work for older SentencePiece versions <= 3.20.3
             from transformers.utils import sentencepiece_model_pb2
 
@@ -402,7 +402,7 @@ def fix_sentencepiece_tokenizer(
         # [TODO] Hack for Starling - try except
         try:
             tokenizer_piece = tokenizer_file.pieces[ids]
-        except:
+        except (IndexError, KeyError):
             continue
         assert tokenizer_piece.piece == old_token
         tokenizer_piece.piece = new_token
@@ -528,7 +528,7 @@ def _load_correct_tokenizer(
             from_slow = True,
             cache_dir = cache_dir,
         )
-    except:
+    except Exception:
         slow_tokenizer = None
         # print(
         #     f"Unsloth: {tokenizer_name} has no tokenizer.model file.\n"\
@@ -686,7 +686,7 @@ def fix_chat_template(tokenizer):
             messages, add_generation_prompt = False, tokenize = False
         )
         is_sharegpt = False
-    except:
+    except Exception:
         try:
             messages = [
                 {"from": "human", "value": "Who are you?"},
@@ -695,7 +695,7 @@ def fix_chat_template(tokenizer):
                 messages, add_generation_prompt = False, tokenize = False
             )
             is_sharegpt = True
-        except:
+        except Exception:
             is_sharegpt = None
 
     # Not ShareGPT or HF style - just return
@@ -880,7 +880,7 @@ def check_tokenizer(
                     _reload = False,
                 )
                 break
-            except:
+            except Exception:
                 # Tokenizer has out of bounds issues and we can't
                 # load the slow tokenizer version :(
                 logger.warning_once(
@@ -901,7 +901,7 @@ from transformers.trainer import *
 
 try:
     from trl.trainer.sft_trainer import neftune_post_forward_hook
-except:
+except ImportError:
 
     def neftune_post_forward_hook(module, input, output):
         """
@@ -938,7 +938,7 @@ def patch_sft_trainer_tokenizer():
     """
     try:
         sft_trainer = eval(f"trl.trainer.sft_trainer.SFTTrainer")
-    except:
+    except (AttributeError, NameError):
         return
     all_imports = dir(trl.trainer.sft_trainer)
 

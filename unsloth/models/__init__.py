@@ -22,7 +22,7 @@ from .granite import FastGraniteModel
 
 try:
     from .falcon_h1 import FastFalconH1Model
-except:
+except ImportError:
     # transformers_version < 4.53.0 does not have falcon_h1 so silently skip it for now
     pass
 from .dpo import PatchDPOTrainer, PatchKTOTrainer

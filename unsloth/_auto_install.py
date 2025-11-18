@@ -13,7 +13,7 @@
 # limitations under the License.
 
 try: import torch
-except: raise ImportError('Install torch via `pip install torch`')
+except ImportError: raise ImportError('Install torch via `pip install torch`')
 from packaging.version import Version as V
 import re
 v = V(re.match(r"[0-9\.]{3,}", torch.__version__).group(0))

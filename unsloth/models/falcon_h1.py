@@ -31,7 +31,7 @@ try:
         FalconH1ForCausalLM,
         FalconHybridMambaAttentionDynamicCache,
     )
-except:
+except ImportError:
     from transformers import __version__ as transformers_version
 
     transformers_version = Version(transformers_version)

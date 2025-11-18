@@ -36,10 +36,10 @@ import os, contextlib, sys
 
 try:
     from huggingface_hub import get_token
-except:
+except ImportError:
     try:
         from huggingface_hub.utils import get_token
-    except:
+    except ImportError:
         # For older versions of huggingface_hub
         from huggingface_hub.utils._token import get_token
 from huggingface_hub import HfFileSystem
@@ -151,7 +151,7 @@ class FastLanguageModel(FastLlamaModel):
                 from huggingface_hub import login
 
                 login(token = token)
-            except:
+            except Exception:
                 pass
         if load_in_8bit or full_finetuning or qat_scheme is not None:
             return FastModel.from_pretrained(
@@ -590,7 +590,7 @@ try:
     from transformers import AutoModelForImageTextToText
 
     AutoModelForVision2Seq = AutoModelForImageTextToText
-except:
+except ImportError:
     from transformers import AutoModelForVision2Seq
 
 
@@ -645,7 +645,7 @@ class FastModel(FastBaseModel):
                 from huggingface_hub import login
 
                 login(token = token)
-            except:
+            except Exception:
                 pass
         if whisper_language is not None:
             assert type(whisper_language) is str

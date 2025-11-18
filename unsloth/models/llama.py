@@ -45,7 +45,7 @@ transformers_version = Version(transformers_version)
 IS_ATTENTION_REFACTOR = transformers_version > Version("4.47.1")
 try:
     from transformers.modeling_layers import GradientCheckpointingLayer
-except:
+except ImportError:
     GradientCheckpointingLayer = type(None)
 
 from transformers.models.llama.modeling_llama import (
@@ -77,7 +77,7 @@ try:
         LlamaSdpaAttention,
         LlamaFlashAttention2,
     )
-except:
+except ImportError:
     LlamaSdpaAttention = LlamaAttention
     LlamaFlashAttention2 = LlamaAttention
 
@@ -98,7 +98,7 @@ import types
 
 try:
     from huggingface_hub.utils import get_token
-except:
+except ImportError:
     # Old HF Hub versions <= 0.0.25
     from huggingface_hub.utils._token import get_token
 from triton import __version__ as triton_version
@@ -173,7 +173,7 @@ def _fast_prepare_inputs_for_generation(
                     try:
                         sig = inspect.signature(inspect.unwrap(fn))
                         return "device" in sig.parameters
-                    except:
+                    except (ValueError, TypeError, OSError):
                         # transformers <= 4.51.3 includes device arg but > 4.51.3 does not
                         return transformers_version < Version("4.52.0")
 
@@ -193,7 +193,7 @@ def _fast_prepare_inputs_for_generation(
                         base_model._prepare_4d_causal_attention_mask_with_cache_position
                     ):
                         kwargs["device"] = input_ids.device
-                except:
+                except Exception:
                     print(
                         f"Unsloth: Could not inspect signature of {base_model._prepare_4d_causal_attention_mask_with_cache_position}"
                     )
@@ -2161,7 +2161,7 @@ class FastLlamaModel:
             gpu_stats_snippet = f"CUDA: {gpu_stats.major}.{gpu_stats.minor}. CUDA Toolkit: {gpu_version}."
             try:
                 vllm_version = f" vLLM: {importlib_version('vllm')}."
-            except:
+            except Exception:
                 vllm_version = ""
         elif DEVICE_TYPE == "hip":
             gpu_stats = torch.cuda.get_device_properties(0)
@@ -2172,7 +2172,7 @@ class FastLlamaModel:
             gpu_stats_snippet = f"ROCm Toolkit: {gpu_version}."
             try:
                 vllm_version = f" vLLM: {importlib_version('vllm')}."
-            except:
+            except Exception:
                 vllm_version = ""
         elif DEVICE_TYPE == "xpu":
             gpu_stats = torch.xpu.get_device_properties(0)
@@ -2183,7 +2183,7 @@ class FastLlamaModel:
             gpu_stats_snippet = f"Intel Toolkit: {gpu_version}."
             try:
                 vllm_version = f" vLLM: {importlib_version('vllm')}."
-            except:
+            except Exception:
                 vllm_version = ""
         else:
             raise ValueError(f"Unsloth: Unsupported device type: {DEVICE_TYPE}")
@@ -2254,7 +2254,7 @@ class FastLlamaModel:
         try:
             with open(inspect.getfile(model_function), "r", encoding = "utf-8") as file:
                 has_rope_scaling = "self.config.rope_scaling" in file.read()
-        except:
+        except (OSError, TypeError):
             pass
         has_rope_scaling = True
 
@@ -2417,7 +2417,7 @@ class FastLlamaModel:
                 Trainer._original_training_loop = inner_training_loop
             else:
                 inner_training_loop = Trainer._original_training_loop
-        except:
+        except (OSError, TypeError):
             raise RuntimeError("Unsloth: Unsuccessfully patched inner_training_loop")
 
         import transformers.trainer

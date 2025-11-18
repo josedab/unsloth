@@ -36,7 +36,7 @@ try:
         _flex_attention, dynamic = True, options = torch_compile_options
     )
     HAS_FLEX_ATTENTION = False
-except:
+except ImportError:
     HAS_FLEX_ATTENTION = False
 
 
