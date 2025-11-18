@@ -51,6 +51,13 @@ from .utils import (
     QUANT_STATE,
     fast_linear_forward,
     matmul_lora,
+    FUSED_LORA_FORWARD_ENABLED,
+)
+from .fused_lora_forward import (
+    fused_lora_forward,
+    fused_lora_forward_kernel,
+    matmul_lora_fused,
+    FUSED_FORWARD_ENABLED,
 )
 
 from .flex_attention import (

@@ -30,6 +30,10 @@ from ..device_type import (
 )
 from .fp8 import weight_dequant, fp8_linear
 import functools
+import os
+
+# Environment variable to disable fused LoRA forward kernel
+FUSED_LORA_FORWARD_ENABLED = not os.environ.get("UNSLOTH_DISABLE_FUSED_FORWARD", False)
 
 # torch.cuda.amp.custom_fwd is deprecated >= 2.4
 import torch
@@ -982,21 +986,64 @@ def matmul_lora(X, W, W_quant, A, B, s, out = None):
         X = X.view(-1, X.shape[-1])
         reshape = True
     else:
+        batch = seq_len = None
         reshape = False
 
+    # Handle FP8 quantization (not fused yet)
     if W.dtype == torch.float8_e4m3fn:
         out = fp8_linear(X, W, W_quant)
-    else:
-        W = fast_dequantize(W.t(), W_quant, use_global_buffer = True)
-        out = torch_matmul(X, W, out = out)
+        if A is not None:
+            # LoRA is enabled - use standard path for FP8
+            A_t, B_t = A.t(), B.t()
+            XA = torch_matmul(X, A_t.to(dtype))
+            out.addmm_(XA, B_t.to(dtype), alpha = s)
+        return out.view(batch, seq_len, -1) if reshape else out
+
+    # Dequantize weights
+    W = fast_dequantize(W.t(), W_quant, use_global_buffer = True)
+
+    # Check if we should use fused kernel
+    # Fused kernel requirements:
+    # - FUSED_LORA_FORWARD_ENABLED is True
+    # - LoRA is enabled (A is not None)
+    # - On CUDA device (not CPU)
+    use_fused = (
+        FUSED_LORA_FORWARD_ENABLED and
+        A is not None and
+        X.is_cuda
+    )
+
+    if use_fused:
+        try:
+            from .fused_lora_forward import fused_lora_forward
+
+            # Transpose LoRA matrices to match kernel expectations
+            # A: [R, K] -> [K, R]
+            # B: [N, R] -> [R, N]
+            A_t = A.t().to(dtype)
+            B_t = B.t().to(dtype)
+
+            # Use fused kernel
+            out = fused_lora_forward(X, W, A_t, B_t, s, out=out)
+
+            if W_quant is not None:
+                del W
+
+            return out.view(batch, seq_len, -1) if reshape else out
+        except Exception:
+            # Fallback to standard implementation on error
+            pass
+
+    # Standard implementation
+    out = torch_matmul(X, W, out = out)
     if W_quant is not None:
         del W
 
     if A is not None:
         # LoRA is enabled
-        A, B = A.t(), B.t()
-        XA = torch_matmul(X, A.to(dtype))
-        out.addmm_(XA, B.to(dtype), alpha = s)
+        A_t, B_t = A.t(), B.t()
+        XA = torch_matmul(X, A_t.to(dtype))
+        out.addmm_(XA, B_t.to(dtype), alpha = s)
         # out += (X @ A.to(dtype)) @ (s * B.to(dtype))
 
     return out.view(batch, seq_len, -1) if reshape else out
