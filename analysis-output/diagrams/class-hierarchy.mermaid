@@ -1,0 +1,78 @@
+%% Unsloth Model Class Hierarchy
+%% Commit: 341ce85864d191e4a6b7c447b9167c1faf5e20d3
+
+classDiagram
+    class FastBaseModel {
+        <<abstract>>
+        +from_pretrained()
+        +pre_patch()
+        +post_patch()
+        +for_inference()
+    }
+
+    class FastLlamaModel {
+        +pre_patch()
+        +get_peft_model()
+        +merge_and_unload()
+        -_patch_attention()
+        -_patch_mlp()
+    }
+
+    class FastMistralModel {
+        +pre_patch()
+    }
+
+    class FastQwen2Model {
+        +pre_patch()
+    }
+
+    class FastQwen3Model {
+        +pre_patch()
+    }
+
+    class FastQwen3MoeModel {
+        +pre_patch()
+        -_patch_moe()
+    }
+
+    class FastGemmaModel {
+        +pre_patch()
+    }
+
+    class FastGemma2Model {
+        +pre_patch()
+    }
+
+    class FastCohereModel {
+        +pre_patch()
+    }
+
+    class FastGraniteModel {
+        +pre_patch()
+    }
+
+    class FastLanguageModel {
+        <<facade>>
+        +from_pretrained()
+        +get_peft_model()
+    }
+
+    class FastVisionModel {
+        +from_pretrained()
+        +process_vision_info()
+    }
+
+    FastBaseModel <|-- FastLlamaModel
+    FastLlamaModel <|-- FastMistralModel
+    FastLlamaModel <|-- FastQwen2Model
+    FastLlamaModel <|-- FastQwen3Model
+    FastQwen3Model <|-- FastQwen3MoeModel
+    FastLlamaModel <|-- FastGemmaModel
+    FastGemmaModel <|-- FastGemma2Model
+    FastLlamaModel <|-- FastCohereModel
+    FastLlamaModel <|-- FastGraniteModel
+    FastLlamaModel <|-- FastLanguageModel
+    FastBaseModel <|-- FastVisionModel
+
+    note for FastLlamaModel "Base class for all LLM optimizations\nDespite name, used for Mistral, Qwen, etc."
+    note for FastLanguageModel "Main user-facing API\nAuto-detects architecture"

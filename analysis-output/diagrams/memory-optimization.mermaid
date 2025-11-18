@@ -1,0 +1,45 @@
+%% Unsloth Memory Optimization Strategies
+%% Commit: 341ce85864d191e4a6b7c447b9167c1faf5e20d3
+
+graph LR
+    subgraph Standard["Standard Training (64GB)"]
+        SW[Weights<br/>14GB]
+        SG[Gradients<br/>14GB]
+        SO[Optimizer<br/>28GB]
+        SA[Activations<br/>8GB]
+    end
+
+    subgraph Unsloth["Unsloth Training (9GB)"]
+        UW[4-bit Weights<br/>3.5GB]
+        UG[LoRA Grads<br/>0.5GB]
+        UO[LoRA Opt<br/>1GB]
+        UA[Checkpointed<br/>4GB]
+    end
+
+    subgraph Techniques["Optimization Techniques"]
+        Q4[4-bit Quantization<br/>-75% weights]
+        LoRA[LoRA Training<br/>-96% gradients]
+        Opt8[8-bit Optimizer<br/>-96% optimizer]
+        GC[Gradient Checkpoint<br/>-50% activations]
+    end
+
+    SW -.->|Quantize| Q4
+    Q4 -.-> UW
+
+    SG -.->|LoRA Only| LoRA
+    LoRA -.-> UG
+
+    SO -.->|Paged AdamW| Opt8
+    Opt8 -.-> UO
+
+    SA -.->|Recompute| GC
+    GC -.-> UA
+
+    %% Styling
+    classDef standard fill:#ffcdd2,stroke:#c62828
+    classDef unsloth fill:#c8e6c9,stroke:#2e7d32
+    classDef technique fill:#fff9c4,stroke:#f9a825
+
+    class SW,SG,SO,SA standard
+    class UW,UG,UO,UA unsloth
+    class Q4,LoRA,Opt8,GC technique

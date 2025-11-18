@@ -1,0 +1,74 @@
+%% Unsloth Model Loading Pipeline
+%% Commit: 341ce85864d191e4a6b7c447b9167c1faf5e20d3
+
+flowchart TD
+    Start([User calls from_pretrained])
+
+    subgraph Resolution["Model Resolution"]
+        Lookup[Registry Lookup]
+        Infer[Infer from Config]
+        Select[Select Fast*Model Class]
+    end
+
+    subgraph PrePatch["Pre-Patching Phase"]
+        PatchAttn[Patch Attention Forward]
+        PatchNorm[Patch LayerNorm]
+        PatchMLP[Patch MLP Forward]
+    end
+
+    subgraph Loading["Model Loading"]
+        LoadConfig[Load Config from Hub]
+        LoadWeights[Load Model Weights]
+        Quantize{4-bit?}
+        ApplyBNB[Apply BitsAndBytes]
+        LoadFP16[Load in FP16]
+    end
+
+    subgraph PostPatch["Post-Patching Phase"]
+        GradCheck[Setup Gradient Checkpointing]
+        PatchTokenizer[Patch Tokenizer]
+        SetupKV[Configure KV Cache]
+    end
+
+    subgraph LoRA["LoRA Application"]
+        CreateConfig[Create LoraConfig]
+        ApplyPEFT[Apply PEFT]
+        PatchLoRA[Patch LoRA Forward]
+    end
+
+    End([Return model, tokenizer])
+
+    Start --> Lookup
+    Lookup -->|Found| Select
+    Lookup -->|Not Found| Infer
+    Infer --> Select
+
+    Select --> PatchAttn
+    PatchAttn --> PatchNorm
+    PatchNorm --> PatchMLP
+
+    PatchMLP --> LoadConfig
+    LoadConfig --> LoadWeights
+    LoadWeights --> Quantize
+
+    Quantize -->|Yes| ApplyBNB
+    Quantize -->|No| LoadFP16
+
+    ApplyBNB --> GradCheck
+    LoadFP16 --> GradCheck
+
+    GradCheck --> PatchTokenizer
+    PatchTokenizer --> SetupKV
+
+    SetupKV --> CreateConfig
+    CreateConfig --> ApplyPEFT
+    ApplyPEFT --> PatchLoRA
+
+    PatchLoRA --> End
+
+    %% Styling
+    classDef phase fill:#e3f2fd,stroke:#1565c0
+    classDef decision fill:#fff9c4,stroke:#f9a825
+
+    class Resolution,PrePatch,Loading,PostPatch,LoRA phase
+    class Quantize decision

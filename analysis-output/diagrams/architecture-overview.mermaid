@@ -1,0 +1,77 @@
+%% Unsloth Architecture Overview
+%% Commit: 341ce85864d191e4a6b7c447b9167c1faf5e20d3
+
+graph TB
+    subgraph UserLayer["User Interface Layer"]
+        FLM[FastLanguageModel]
+        FVM[FastVisionModel]
+        UT[UnslothTrainer]
+        Save[save_to_gguf]
+    end
+
+    subgraph OptLayer["Optimization Layer"]
+        Patches[Monkey Patches]
+        Memory[Memory Management]
+        GradCheck[Gradient Checkpointing]
+    end
+
+    subgraph IntLayer["Integration Layer"]
+        TF[transformers]
+        PEFT[peft]
+        TRL[trl]
+        BNB[bitsandbytes]
+    end
+
+    subgraph KernelLayer["Kernel Layer"]
+        FastLoRA[Fast LoRA]
+        FlashAttn[Flash Attention]
+        RMSNorm[RMS LayerNorm]
+        CrossEnt[Cross-Entropy]
+        Triton[Triton Runtime]
+    end
+
+    subgraph Hardware["Hardware Layer"]
+        PyTorch[PyTorch]
+        CUDA[CUDA/HIP/XPU]
+        GPU[GPU Hardware]
+    end
+
+    %% User to Optimization
+    FLM --> Patches
+    FVM --> Patches
+    UT --> Memory
+    Save --> Patches
+
+    %% Optimization to Integration
+    Patches --> TF
+    Patches --> PEFT
+    Memory --> TRL
+    GradCheck --> TF
+
+    %% Integration to Kernel
+    TF --> FastLoRA
+    TF --> FlashAttn
+    PEFT --> FastLoRA
+    BNB --> CrossEnt
+
+    %% Kernel to Hardware
+    FastLoRA --> Triton
+    FlashAttn --> Triton
+    RMSNorm --> Triton
+    CrossEnt --> Triton
+    Triton --> PyTorch
+    PyTorch --> CUDA
+    CUDA --> GPU
+
+    %% Styling
+    classDef userClass fill:#e1f5fe,stroke:#01579b
+    classDef optClass fill:#f3e5f5,stroke:#4a148c
+    classDef intClass fill:#fff3e0,stroke:#e65100
+    classDef kernelClass fill:#e8f5e9,stroke:#1b5e20
+    classDef hwClass fill:#fce4ec,stroke:#880e4f
+
+    class FLM,FVM,UT,Save userClass
+    class Patches,Memory,GradCheck optClass
+    class TF,PEFT,TRL,BNB intClass
+    class FastLoRA,FlashAttn,RMSNorm,CrossEnt,Triton kernelClass
+    class PyTorch,CUDA,GPU hwClass

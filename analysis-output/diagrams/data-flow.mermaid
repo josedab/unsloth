@@ -1,0 +1,54 @@
+%% Unsloth Training Data Flow
+%% Commit: 341ce85864d191e4a6b7c447b9167c1faf5e20d3
+
+sequenceDiagram
+    participant User
+    participant DataLoader
+    participant Tokenizer
+    participant Model
+    participant Kernels
+    participant Optimizer
+    participant GPU
+
+    User->>DataLoader: Training data
+    DataLoader->>Tokenizer: Raw text
+    Tokenizer->>Tokenizer: Tokenize + pad
+    Tokenizer->>GPU: Input tensors
+
+    loop Training Loop
+        GPU->>Model: Forward pass
+
+        Note over Model: Embedding Layer
+        Model->>Kernels: Token embeddings
+
+        loop For each layer (32x)
+            Note over Kernels: RMS LayerNorm (Triton)
+            Kernels->>Kernels: Normalize
+
+            Note over Kernels: Attention (Flash Attention)
+            Kernels->>Kernels: Q/K/V projection
+            Kernels->>Kernels: RoPE embeddings
+            Kernels->>Kernels: Attention computation
+            Kernels->>Kernels: Output projection
+
+            Note over Kernels: MLP (Fast LoRA)
+            Kernels->>Kernels: Gate + Up projection
+            Kernels->>Kernels: SwiGLU activation
+            Kernels->>Kernels: Down projection
+
+            Note over Model: Residual + Checkpoint
+        end
+
+        Note over Kernels: Cross-Entropy Loss (Fused)
+        Kernels->>Model: Loss value
+
+        Model->>GPU: Backward pass
+
+        Note over Kernels: Fast LoRA Backward (5-10x)
+        Kernels->>Kernels: Compute dA, dB
+
+        GPU->>Optimizer: Gradients
+        Optimizer->>GPU: Update LoRA weights
+    end
+
+    GPU->>User: Trained model
