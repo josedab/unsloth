@@ -14,8 +14,23 @@
 
 import warnings
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Type,
+    Union,
+    TYPE_CHECKING,
+)
 from functools import wraps
+
+if TYPE_CHECKING:
+    from transformers import PreTrainedModel, PreTrainedTokenizer
+    from transformers.trainer import TrainerCallback
+    from datasets import Dataset
+    from torch.optim import Optimizer
 
 import trl
 import inspect
@@ -70,17 +85,30 @@ except:
 
 
 class UnslothTrainingArguments(TrainingArguments):
-    def __init__(self, embedding_learning_rate: float = None, *args, **kwargs):
-        embedding_learning_rate = embedding_learning_rate
+    """
+    Training arguments for Unsloth with support for custom embedding learning rates.
+
+    Args:
+        embedding_learning_rate: Separate learning rate for embedding layers
+        *args: Additional arguments passed to TrainingArguments
+        **kwargs: Additional keyword arguments passed to TrainingArguments
+    """
+    def __init__(
+        self,
+        embedding_learning_rate: Optional[float] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        self.embedding_learning_rate = embedding_learning_rate
         super().__init__(*args, **kwargs)
 
 
 def _create_unsloth_optimizer(
-    model,
-    optimizer_cls,
-    optimizer_kwargs,
-    embedding_lr = 5e-5,
-):
+    model: "PreTrainedModel",
+    optimizer_cls: Type["Optimizer"],
+    optimizer_kwargs: Dict[str, Any],
+    embedding_lr: float = 5e-5,
+) -> "Optimizer":
     lr = optimizer_kwargs["lr"]
     weight_decay = optimizer_kwargs.get("weight_decay", 0.0)
 
@@ -119,7 +147,19 @@ def _create_unsloth_optimizer(
 
 
 class UnslothTrainer(SFTTrainer):
-    def create_optimizer(self):
+    """
+    Unsloth trainer with support for custom embedding learning rates.
+
+    Extends SFTTrainer with the ability to use different learning rates
+    for embedding layers vs other parameters.
+    """
+    def create_optimizer(self) -> "Optimizer":
+        """
+        Create optimizer with separate learning rate for embeddings.
+
+        Returns:
+            The created optimizer
+        """
         embedding_learning_rate = getattr(self.args, "embedding_learning_rate", None)
         if embedding_learning_rate is None:
             return super().create_optimizer()

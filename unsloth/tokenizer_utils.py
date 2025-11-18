@@ -12,6 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import (
+    Any,
+    Optional,
+    Union,
+    TYPE_CHECKING,
+)
+
+if TYPE_CHECKING:
+    from transformers import PreTrainedTokenizer
+
 from transformers import AutoTokenizer
 from transformers.convert_slow_tokenizer import convert_slow_tokenizer
 from transformers import PreTrainedTokenizerFast
@@ -422,10 +432,14 @@ def fix_sentencepiece_tokenizer(
     return tokenizer
 
 
-def fix_sentencepiece_gguf(saved_location):
+def fix_sentencepiece_gguf(saved_location: str) -> None:
     """
     Fixes sentencepiece tokenizers which did not extend the vocabulary with
     user defined tokens.
+
+    Args:
+        saved_location: Directory containing the tokenizer files
+
     Inspiration from https://github.com/ggerganov/llama.cpp/blob/master/convert_hf_to_gguf.py
     """
     from copy import deepcopy
@@ -579,14 +593,29 @@ def _load_correct_tokenizer(
 
 
 def load_correct_tokenizer(
-    tokenizer_name,
-    model_max_length = None,
-    padding_side = "right",
-    token = None,
-    trust_remote_code = False,
-    cache_dir = "huggingface_tokenizers_cache",
-    fix_tokenizer = True,
-):
+    tokenizer_name: str,
+    model_max_length: Optional[int] = None,
+    padding_side: str = "right",
+    token: Optional[str] = None,
+    trust_remote_code: bool = False,
+    cache_dir: str = "huggingface_tokenizers_cache",
+    fix_tokenizer: bool = True,
+) -> "PreTrainedTokenizer":
+    """
+    Load a tokenizer with correct settings and fixes.
+
+    Args:
+        tokenizer_name: Name or path of the tokenizer
+        model_max_length: Maximum sequence length
+        padding_side: Side for padding ('left' or 'right')
+        token: HuggingFace API token
+        trust_remote_code: Allow custom tokenizer code
+        cache_dir: Directory for caching tokenizers
+        fix_tokenizer: Whether to apply tokenizer fixes
+
+    Returns:
+        The loaded and configured tokenizer
+    """
     tokenizer = _load_correct_tokenizer(
         tokenizer_name = tokenizer_name,
         model_max_length = model_max_length,

@@ -12,6 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import (
+    Any,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Union,
+    TYPE_CHECKING,
+)
+from pathlib import Path
+
+if TYPE_CHECKING:
+    import torch
+    from transformers import PreTrainedModel, PreTrainedTokenizer
+    from peft import PeftModel as PeftModelType
+
+from ..types import (
+    ModelName,
+    DType,
+    DeviceMap,
+    ModelTokenizerTuple,
+    GradientCheckpointing,
+)
+
 from ._utils import (
     _prepare_model_for_qat,
     is_bfloat16_supported,
@@ -115,34 +140,34 @@ DISABLE_SDPA_MODEL_NAMES = [
 class FastLanguageModel(FastLlamaModel):
     @staticmethod
     def from_pretrained(
-        model_name = "unsloth/Llama-3.2-1B-Instruct",
-        max_seq_length = 2048,
-        dtype = None,
-        load_in_4bit = True,  # 4bit QLoRA
-        load_in_8bit = False,  # 8bit  LoRA
-        load_in_16bit = False,  # 16bit LoRA
-        full_finetuning = False,
-        token = None,
-        device_map = "sequential",
-        rope_scaling = None,
-        fix_tokenizer = True,
-        trust_remote_code = False,
-        use_gradient_checkpointing = "unsloth",
-        resize_model_vocab = None,
-        revision = None,
-        use_exact_model_name = False,
-        offload_embedding = False,
-        float32_mixed_precision = None,  # Forces float32 mixed precision
-        fast_inference = False,  # uses vLLM
-        gpu_memory_utilization = 0.5,
-        float8_kv_cache = False,
-        random_state = 3407,
-        max_lora_rank = 64,
-        disable_log_stats = True,
-        qat_scheme = None,
-        *args,
-        **kwargs,
-    ):
+        model_name: ModelName = "unsloth/Llama-3.2-1B-Instruct",
+        max_seq_length: Optional[int] = 2048,
+        dtype: DType = None,
+        load_in_4bit: bool = True,
+        load_in_8bit: bool = False,
+        load_in_16bit: bool = False,
+        full_finetuning: bool = False,
+        token: Optional[str] = None,
+        device_map: DeviceMap = "sequential",
+        rope_scaling: Optional[Dict[str, Any]] = None,
+        fix_tokenizer: bool = True,
+        trust_remote_code: bool = False,
+        use_gradient_checkpointing: GradientCheckpointing = "unsloth",
+        resize_model_vocab: Optional[int] = None,
+        revision: Optional[str] = None,
+        use_exact_model_name: bool = False,
+        offload_embedding: bool = False,
+        float32_mixed_precision: Optional[bool] = None,
+        fast_inference: bool = False,
+        gpu_memory_utilization: float = 0.5,
+        float8_kv_cache: bool = False,
+        random_state: int = 3407,
+        max_lora_rank: int = 64,
+        disable_log_stats: bool = True,
+        qat_scheme: Optional[str] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> ModelTokenizerTuple:
         # Login to allow private models
         if token is None:
             token = get_token()
@@ -596,47 +621,46 @@ except:
 
 class FastModel(FastBaseModel):
     @staticmethod
-    def _prepare_for_qat(model, qat_scheme):
+    def _prepare_for_qat(model: "PreTrainedModel", qat_scheme: str) -> "PreTrainedModel":
         model = _prepare_model_for_qat(model, qat_scheme)
         return model
 
     @staticmethod
     def from_pretrained(
-        model_name = "unsloth/Llama-3.2-11B-Vision-Instruct-bnb-4bit",
-        max_seq_length = 2048,
-        dtype = None,
-        load_in_4bit = True,  # 4bit QLoRA
-        load_in_8bit = False,  # 8bit  LoRA
-        load_in_16bit = False,  # 16bit LoRA
-        full_finetuning = False,
-        token = None,
-        device_map = "sequential",
-        rope_scaling = None,  # [TODO] No effect
-        fix_tokenizer = True,  # [TODO] No effect
-        trust_remote_code = False,
-        use_gradient_checkpointing = "unsloth",
-        resize_model_vocab = None,  # [TODO] No effect
-        revision = None,
-        return_logits = False,  # Return logits
-        fullgraph = True,  # No graph breaks
-        use_exact_model_name = False,
-        auto_model = None,
-        whisper_language = None,
-        whisper_task = None,
-        unsloth_force_compile = False,
-        offload_embedding = False,
-        float32_mixed_precision = None,  # Forces float32 mixed precision
-        # Add the missing vLLM/inference parameters
-        fast_inference = False,  # uses vLLM
-        gpu_memory_utilization = 0.5,
-        float8_kv_cache = False,
-        random_state = 3407,
-        max_lora_rank = 64,
-        disable_log_stats = True,
-        qat_scheme = None,
-        *args,
-        **kwargs,
-    ):
+        model_name: ModelName = "unsloth/Llama-3.2-11B-Vision-Instruct-bnb-4bit",
+        max_seq_length: Optional[int] = 2048,
+        dtype: DType = None,
+        load_in_4bit: bool = True,
+        load_in_8bit: bool = False,
+        load_in_16bit: bool = False,
+        full_finetuning: bool = False,
+        token: Optional[str] = None,
+        device_map: DeviceMap = "sequential",
+        rope_scaling: Optional[Dict[str, Any]] = None,
+        fix_tokenizer: bool = True,
+        trust_remote_code: bool = False,
+        use_gradient_checkpointing: GradientCheckpointing = "unsloth",
+        resize_model_vocab: Optional[int] = None,
+        revision: Optional[str] = None,
+        return_logits: bool = False,
+        fullgraph: bool = True,
+        use_exact_model_name: bool = False,
+        auto_model: Optional[Any] = None,
+        whisper_language: Optional[str] = None,
+        whisper_task: Optional[str] = None,
+        unsloth_force_compile: bool = False,
+        offload_embedding: bool = False,
+        float32_mixed_precision: Optional[bool] = None,
+        fast_inference: bool = False,
+        gpu_memory_utilization: float = 0.5,
+        float8_kv_cache: bool = False,
+        random_state: int = 3407,
+        max_lora_rank: int = 64,
+        disable_log_stats: bool = True,
+        qat_scheme: Optional[str] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> ModelTokenizerTuple:
         if token is None:
             token = get_token()
         # Login to allow private models

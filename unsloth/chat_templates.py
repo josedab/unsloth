@@ -27,6 +27,22 @@ __all__ = [
     "test_construct_chat_template",
 ]
 
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    TYPE_CHECKING,
+)
+
+if TYPE_CHECKING:
+    from transformers import PreTrainedTokenizer
+    from datasets import Dataset
+
+from .types import ChatTemplateType, MappingType
+
 from transformers import StoppingCriteria, StoppingCriteriaList
 from torch import LongTensor, FloatTensor
 from transformers.models.llama.modeling_llama import logger
@@ -2121,12 +2137,25 @@ def _change_system_message(template: str, type_chat_template: str, system_messag
 
 
 def get_chat_template(
-    tokenizer,
-    chat_template = "chatml",
-    mapping = {"role" : "role", "content" : "content", "user" : "user", "assistant" : "assistant"},
-    map_eos_token = True,
-    system_message = None,
-):
+    tokenizer: "PreTrainedTokenizer",
+    chat_template: Union[str, Tuple[str, str]] = "chatml",
+    mapping: Dict[str, str] = {"role" : "role", "content" : "content", "user" : "user", "assistant" : "assistant"},
+    map_eos_token: bool = True,
+    system_message: Optional[str] = None,
+) -> "PreTrainedTokenizer":
+    """
+    Apply a chat template to a tokenizer.
+
+    Args:
+        tokenizer: The tokenizer to apply the template to
+        chat_template: Template name or custom template tuple
+        mapping: Mapping for role/content keys
+        map_eos_token: Whether to map stop word to EOS token
+        system_message: Custom system message
+
+    Returns:
+        The tokenizer with the chat template applied
+    """
     assert(type(map_eos_token) is bool)
     old_tokenizer = tokenizer
 
@@ -2906,12 +2935,10 @@ def test_construct_chat_template():
     assert(correct_output == new_output)
 
 
-def apply_chat_template( \
-
-dataset,
-tokenizer = None,
-
-chat_template = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+def apply_chat_template(
+    dataset: "Dataset",
+    tokenizer: Optional["PreTrainedTokenizer"] = None,
+    chat_template: str = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
 {SYSTEM}<|eot_id|><|start_header_id|>user<|end_header_id|>
 
@@ -2922,13 +2949,9 @@ chat_template = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 {INPUT}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 {OUTPUT}<|eot_id|>""",
-
-default_system_message = \
-    "Below are some instructions that describe some tasks. Write responses that appropriately complete each request.",
-
-extra_eos_tokens = None,
-
-):
+    default_system_message: str = "Below are some instructions that describe some tasks. Write responses that appropriately complete each request.",
+    extra_eos_tokens: Optional[List[str]] = None,
+) -> "Dataset":
     """
     Creates a Ollama modelfile and a HF Jinja template from a custom
     template. You must provide 2x examples of an input & output.

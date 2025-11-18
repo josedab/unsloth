@@ -26,7 +26,21 @@ from unsloth_zoo.llama_cpp import (
 from bitsandbytes.nn import Linear4bit as Bnb_Linear4bit
 from peft.tuners.lora import Linear4bit as Peft_Linear4bit
 from peft.tuners.lora import Linear as Peft_Linear
-from typing import Optional, Callable, Union, List
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    TYPE_CHECKING,
+)
+
+if TYPE_CHECKING:
+    from transformers import PreTrainedModel, PreTrainedTokenizer
+
+from .types import QuantizationMethod, SaveMethod, PathLike
 import sys
 import requests
 import torch
@@ -1063,11 +1077,11 @@ def save_to_gguf(
     model_dtype: str,
     is_sentencepiece: bool = False,
     model_directory: str = "unsloth_finetuned_model",
-    quantization_method = "fast_quantized",  # Can be a list of options! ["q4_k_m", "q8_0", "q5_k_m"]
-    first_conversion: str = None,
+    quantization_method: Union[str, List[str]] = "fast_quantized",
+    first_conversion: Optional[str] = None,
     is_vlm: bool = False,
     is_gpt_oss: bool = False,
-):
+) -> Tuple[List[str], bool, bool]:
     """
     Orchestrates the complete GGUF conversion process.
     Handles installation, conversion, and quantization.
@@ -1325,23 +1339,23 @@ def save_to_gguf(
 
 
 def unsloth_save_pretrained_merged(
-    self,
+    self: "PreTrainedModel",
     save_directory: Union[str, os.PathLike],
-    tokenizer = None,
-    save_method: str = "merged_16bit",  # ["lora", "merged_16bit", "merged_4bit"]
+    tokenizer: Optional["PreTrainedTokenizer"] = None,
+    save_method: str = "merged_16bit",
     push_to_hub: bool = False,
     token: Optional[Union[str, bool]] = None,
     is_main_process: bool = True,
-    state_dict: Optional[dict] = None,
-    save_function: Callable = torch.save,
+    state_dict: Optional[Dict[str, Any]] = None,
+    save_function: Callable[..., Any] = torch.save,
     max_shard_size: Union[int, str] = "5GB",
     safe_serialization: bool = True,
     variant: Optional[str] = None,
     save_peft_format: bool = True,
-    tags: List[str] = None,
+    tags: Optional[List[str]] = None,
     temporary_location: str = "_unsloth_temporary_saved_buffers",
     maximum_memory_usage: float = 0.75,
-):
+) -> None:
     """
     Same as .save_pretrained(...) except 4bit weights are auto
     converted to float16 with as few overhead as possible.
@@ -1366,10 +1380,10 @@ def unsloth_save_pretrained_merged(
 
 
 def unsloth_push_to_hub_merged(
-    self,
+    self: "PreTrainedModel",
     repo_id: str,
-    tokenizer = None,
-    save_method: str = "merged_16bit",  # ["lora", "merged_16bit", "merged_4bit"]
+    tokenizer: Optional["PreTrainedTokenizer"] = None,
+    save_method: str = "merged_16bit",
     use_temp_dir: Optional[bool] = None,
     commit_message: Optional[str] = "Trained with Unsloth",
     private: Optional[bool] = None,
@@ -1377,12 +1391,12 @@ def unsloth_push_to_hub_merged(
     max_shard_size: Union[int, str, None] = "5GB",
     create_pr: bool = False,
     safe_serialization: bool = True,
-    revision: str = None,
+    revision: Optional[str] = None,
     commit_description: str = "Upload model trained with Unsloth 2x faster",
     tags: Optional[List[str]] = None,
     temporary_location: str = "_unsloth_temporary_saved_buffers",
     maximum_memory_usage: float = 0.75,
-):
+) -> None:
     """
     Same as .push_to_hub(...) except 4bit weights are auto
     converted to float16 with as few overhead as possible.

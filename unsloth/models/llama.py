@@ -16,7 +16,13 @@ import torch
 import gc
 import math
 import functools
-from typing import Any, Dict, Optional, Tuple, List, Union
+from typing import Any, Dict, Optional, Tuple, List, Union, Literal, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from transformers import PreTrainedModel
+    from peft import PeftModel
+
+from ..types import BiasType, GradientCheckpointing
 from ._utils import *
 from ._utils import patch_unsloth_smart_gradient_checkpointing
 from ._utils import __version__, importlib_version
@@ -2592,33 +2598,39 @@ class FastLlamaModel:
 
     @staticmethod
     def get_peft_model(
-        model,
-        r = 16,
-        target_modules = [
-            "q_proj",
-            "k_proj",
-            "v_proj",
-            "o_proj",
-            "gate_proj",
-            "up_proj",
-            "down_proj",
-        ],
-        lora_alpha = 16,
-        lora_dropout = 0.0,
-        bias = "none",
-        layers_to_transform = None,
-        layers_pattern = None,
-        use_gradient_checkpointing = "unsloth",
-        random_state = 3407,
-        max_seq_length = 2048,  # not used anymore
-        use_rslora = False,
-        modules_to_save = None,
-        init_lora_weights = True,
-        loftq_config = {},
-        temporary_location = "_unsloth_temporary_saved_buffers",
-        qat_scheme = None,
-        **kwargs,
-    ):
+        model: "PreTrainedModel",
+        r: int = 16,
+        target_modules: Optional[List[str]] = None,
+        lora_alpha: int = 16,
+        lora_dropout: float = 0.0,
+        bias: BiasType = "none",
+        layers_to_transform: Optional[Union[int, List[int]]] = None,
+        layers_pattern: Optional[str] = None,
+        use_gradient_checkpointing: GradientCheckpointing = "unsloth",
+        random_state: int = 3407,
+        max_seq_length: int = 2048,
+        use_rslora: bool = False,
+        modules_to_save: Optional[List[str]] = None,
+        init_lora_weights: Union[bool, Literal["gaussian", "loftq", "pissa", "pissa_niter_[number of iters]"]] = True,
+        loftq_config: Optional[Dict[str, Any]] = None,
+        temporary_location: str = "_unsloth_temporary_saved_buffers",
+        qat_scheme: Optional[str] = None,
+        **kwargs: Any,
+    ) -> "PeftModel":
+        # Set default for target_modules
+        if target_modules is None:
+            target_modules = [
+                "q_proj",
+                "k_proj",
+                "v_proj",
+                "o_proj",
+                "gate_proj",
+                "up_proj",
+                "down_proj",
+            ]
+        # Set default for loftq_config
+        if loftq_config is None:
+            loftq_config = {}
         if os.environ.get("UNSLOTH_USE_NEW_MODEL", "0") == "1":
             # Check for other PEFT args in kwargs
             for peft_arg, flag in (
